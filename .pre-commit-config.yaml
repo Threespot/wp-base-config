@@ -1,0 +1,25 @@
+# Pre-commit hooks for threespot/wp-base-config.
+#
+# Runs gitleaks against staged changes to stop secrets (keys, tokens,
+# passwords, private keys) from ever entering a commit. This is a LOCAL,
+# per-developer guard and only runs once each contributor installs it:
+#
+#   brew install pre-commit gitleaks   # gitleaks pulled in via the hook too
+#   pre-commit install                 # wires .git/hooks/pre-commit
+#
+# Scan everything already tracked (do this once before going public):
+#
+#   pre-commit run --all-files
+#
+# Bump the pinned gitleaks version with:  pre-commit autoupdate
+#
+# A local hook is opt-in and unenforced, so it is NOT the safety net by itself.
+# The authoritative backstops are server-side: the gitleaks GitHub Action in
+# .github/workflows/gitleaks.yml, plus GitHub's "Secret scanning + push
+# protection" repo setting (free on public repos — enable it after publishing).
+
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.4
+    hooks:
+      - id: gitleaks

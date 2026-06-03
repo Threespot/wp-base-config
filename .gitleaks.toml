@@ -1,0 +1,25 @@
+# gitleaks configuration — https://github.com/gitleaks/gitleaks
+#
+# Inherits the full built-in ruleset (AWS keys, GitHub/Slack tokens, private
+# keys, generic high-entropy strings, etc.). Both the pre-commit hook and the
+# CI scan auto-load this file from the repo root.
+#
+# Add project-specific exceptions to [allowlist] below, and keep them narrow —
+# a broad allowlist entry silently masks real secrets.
+
+title = "wp-base-config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known-safe values that are not real secrets"
+paths = [
+  # Vendored dependencies and the lockfile (gitignored, but guard anyway).
+  '''(^|/)vendor/''',
+  '''composer\.lock''',
+]
+# regexes = [
+#   # Example: a docs/test placeholder that resembles a credential.
+#   '''dev-mysite\.pantheonsite\.io''',
+# ]
