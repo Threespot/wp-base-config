@@ -3,6 +3,13 @@
 namespace Threespot\Wp\Helpers;
 
 /**
+ * Maximum recursion depth for append_icon()'s fully-wrapped-tag handling.
+ * Well-formed input strips one tag per level, so this is only reached by
+ * pathological nesting; it caps the call stack regardless.
+ */
+const APPEND_ICON_MAX_DEPTH = 10;
+
+/**
  * Log an SVG helper error and return it for display only when WP_DEBUG is on.
  *
  * The svg() / append_icon() return value is echoed straight into page markup,
@@ -57,8 +64,10 @@ function svg($params) {
     }
 
     if (!empty($params['file'])) {
+        // Get file by path
         $svg_path = get_theme_file_path("resources/images/{$params['file']}.svg");
     } else {
+        // Get file by ID
         $svg_path = get_attached_file($params['file_id']);
 
         if (!empty($svg_path)) {
@@ -86,6 +95,7 @@ function svg($params) {
         return svg_error('Could not read SVG file.');
     }
 
+    // Load SVG content with libxml security options
     libxml_use_internal_errors(true);
     $svg = new \DOMDocument();
 
@@ -103,6 +113,7 @@ function svg($params) {
         return svg_error('Invalid SVG markup for ' . $svg_path);
     }
 
+  	// Remove unnecessary attributes for inline SVGs
     $svg->documentElement->removeAttribute('baseProfile');
     $svg->documentElement->removeAttribute('version');
 
@@ -122,42 +133,52 @@ function svg($params) {
     $boxWidth = (float) ($dimensions[2] ?? 0);
     $boxHeight = (float) ($dimensions[3] ?? 0);
 
+	// Set height attribute
     if (!empty($params['height'])) {
         $svg->documentElement->setAttribute('height', $params['height']);
 
+    	// Automatically calculate the width if not set
         if (empty($params['width']) && $boxHeight > 0) {
-            $params['width'] = (float) $params['height'] * ($boxWidth / $boxHeight);
+            $params['width'] = round((float) $params['height'] * ($boxWidth / $boxHeight), 3);
             $svg->documentElement->setAttribute('width', (string) $params['width']);
         }
     }
 
+  	// Set width attribute
     if (!empty($params['width'])) {
         $svg->documentElement->setAttribute('width', $params['width']);
 
+    	// Automatically calculate the height if not set
         if (empty($params['height']) && $boxWidth > 0) {
-            $params['height'] = (float) $params['width'] * ($boxHeight / $boxWidth);
+            $params['height'] = round((float) $params['width'] * ($boxHeight / $boxWidth), 3);
             $svg->documentElement->setAttribute('height', (string) $params['height']);
         }
     }
 
+	// Set class attribute
     if (!empty($params['class'])) {
         $svg->documentElement->setAttribute('class', $params['class']);
     }
 
-    // Auto-detect sprite usage from /sprite/ in path. Sprites don't work in admin
-    // because WP uses an iframe for editor content.
+	// Handle sprite usage
+    // Note: Automatically use sprite if the file path contains "/sprite/"
+    // Note: Sprites won't work in the admin since WP uses an iframe for the editor content
     if (
         ($params['sprite'] || str_contains($svg_path, '/sprite/')) &&
         !is_admin()
     ) {
+		// Remove child nodes from original SVG
         while ($svg->documentElement->hasChildNodes()) {
             $svg->documentElement->removeChild($svg->documentElement->firstChild);
         }
 
-        // createDocumentFragment() triggers an undefined-namespace warning:
-        // https://bugs.php.net/bug.php?id=44773
+		// Create <use> element
+		// Note: createDocumentFragment() triggers an undefined-namespace warning
+		// https://bugs.php.net/bug.php?id=44773
+		// https://stackoverflow.com/a/59299852/673457
         $use = $svg->createElement('use');
 
+		// Get filename by removing subfolders from path
         $filename = basename($params['file']);
 
         // All sprite symbols are prefixed with "sprite" (see svg-sprite.blade.php)
@@ -170,19 +191,31 @@ function svg($params) {
 
     // For inline SVGs, append a random suffix to IDs to avoid collisions on the page
     if (!$params['sprite'] && $params['unique_ids']) {
+		// Generate random number
+		// https://www.php.net/manual/en/function.random-bytes.php
         $guid = '_' . bin2hex(random_bytes(3));
 
-        // $id_matches[0] = full markup (e.g. id="foo"); $id_matches[1] = just the ID
+		// Find IDs, save to $id_matches array
+		// NOTE: $id_matches[0] includes the markup (e.g. id="foo")
+		//       $id_matches[1] only includes the ID (e.g. foo)
         preg_match_all('/\bid="(\S+)"/', $svg_markup, $id_matches);
 
+		// Use array_filter() to remove empty and falsey nested arrays
+		// https://www.php.net/manual/en/function.array-filter.php
         if (!empty(array_filter($id_matches))) {
             // Append $guid to IDs
             foreach ($id_matches[0] as $id_match) {
+				// $id_match includes the attribute and quotes, e.g. id="chev",
+				// so we need to remove the closing quote using substr(), append
+				// the guid, then add back the closing quote.
                 $svg_markup = str_replace($id_match, substr($id_match, 0, -1) . $guid . '"', $svg_markup);
             }
 
             // Append $guid to ID references (e.g. xlink:href="#foo", filter="url(#foo)")
             foreach ($id_matches[1] as $id_match) {
+				// Capture group 1: Either `(#` or `"#`
+				// Capture group 2: ID string
+				// Capture group 1: Either `"` or `)`
                 $svg_markup = preg_replace('/([("]#)(' . $id_match . ')([")])/', '$1$2' . $guid . '$3', $svg_markup);
             }
         }
@@ -195,14 +228,26 @@ function svg($params) {
  * Append an SVG icon to the last word of a text run, wrapping the last word
  * in a <span> to prevent orphans.
  *
+ * The text may contain inline HTML. Three layouts are handled so the markup
+ * stays valid:
+ *   - text fully wrapped in a single tag (<em>La Belle</em>) recurses into
+ *     the inner content and re-wraps it;
+ *   - text ending in closing tags (Read <a>more</a>) gets the <span>
+ *     inserted before those closing tags;
+ *   - spaces inside tag attributes are ignored when locating the last word.
+ *
  * @param array $params {
  *     @type string $text
  *     @type string $class Class applied to the wrapping <span>. Default 'u-nowrap'.
  *     @type array  $svg   Params forwarded to svg().
  * }
+ * @param int $depth Internal recursion counter for the fully-wrapped-tag case.
+ *                   Each level strips one wrapping tag, so depth is bounded by
+ *                   the input in practice; APPEND_ICON_MAX_DEPTH caps it
+ *                   regardless to protect against pathological nesting.
  * @return string
  */
-function append_icon($params) {
+function append_icon($params, $depth = 0) {
     $defaults = [
         'text' => '',
         'class' => 'u-nowrap',
@@ -216,21 +261,79 @@ function append_icon($params) {
     ];
 
     $params = array_merge($defaults, $params);
+    // Backfill svg defaults so callers can pass a partial svg array
+    $params['svg'] = array_merge($defaults['svg'], $params['svg']);
 
+	// Ensure text and an SVG filename are provided
     if (empty($params['text']) || empty($params['svg']['file'])) {
         return svg_error('Text or SVG file not specified.');
     }
 
+	// Generate SVG markup
     $svg = svg($params['svg']);
 
-    $words = explode(' ', $params['text']);
+    // Strip HTML tags for word counting purposes
+    $text_plain = wp_strip_all_tags($params['text']);
+    $words = explode(' ', $text_plain);
 
+    // Single word
     if (count($words) === 1) {
-        return '<span class="' . $params['class'] . '">' . $params['text'] . $svg . '</span>';
+        return '<span class="' . esc_attr($params['class']) . '">' . $params['text'] . $svg . '</span>';
     }
 
-    $last_word = array_pop($words);
-    $text = implode(' ', $words);
+    // Check if text is entirely wrapped in an HTML tag (e.g. <em>Example Title</em>)
+    // This regex matches opening tag, content, closing tag. Guarded by $depth so
+    // malformed or pathologically nested input can't recurse without bound; once
+    // the cap is hit the text falls through to the non-recursive handling below.
+    if ($depth < APPEND_ICON_MAX_DEPTH
+        && preg_match('/^<(\w+)(?:\s[^>]*)?>(.+)<\/\1>$/s', $params['text'], $matches)) {
+        $tag_with_attrs = substr($params['text'], 0, strpos($params['text'], '>') + 1); // e.g. "<em>" or "<a href='...'>"
+        $tag_name = $matches[1];
+        $inner_content = $matches[2];
 
-    return $text . ' <span class="' . $params['class'] . '">' . $last_word . $svg . '</span>';
+        // Process the inner content recursively
+        $processed_inner = append_icon([
+            'text' => $inner_content,
+            'class' => $params['class'],
+            'svg' => $params['svg'],
+        ], $depth + 1);
+
+        // Wrap the processed content back in the original tag
+        return $tag_with_attrs . $processed_inner . '</' . $tag_name . '>';
+    }
+
+    // If text ends with one or more closing tags, insert the wrapper <span>
+    // before the closing tags so inline markup remains valid.
+    if (preg_match('/((?:<\/[a-zA-Z][\w:-]*>\s*)+)$/', $params['text'], $matches, PREG_OFFSET_CAPTURE)) {
+        $closing_tags = $matches[1][0];
+        $closing_tags_pos = $matches[1][1];
+        $text_without_closing_tags = rtrim(substr($params['text'], 0, $closing_tags_pos));
+
+        // Find last space not inside an HTML tag (strrpos could match spaces in tag attributes)
+        preg_match_all('/ (?=[^<>]*(?:<|$))/s', $text_without_closing_tags, $space_matches, PREG_OFFSET_CAPTURE);
+        $last_space_pos = !empty($space_matches[0]) ? end($space_matches[0])[1] : false;
+
+        if ($last_space_pos !== false) {
+            $text_before = substr($text_without_closing_tags, 0, $last_space_pos);
+            $last_fragment = substr($text_without_closing_tags, $last_space_pos + 1);
+
+            if ($last_fragment !== '' && strpos($last_fragment, '<') === false) {
+                return $text_before . ' <span class="' . esc_attr($params['class']) . '">' . $last_fragment . $svg . '</span>' . $closing_tags;
+            }
+        }
+    }
+
+    // Find the last space not inside an HTML tag (strrpos could match spaces in tag attributes)
+    preg_match_all('/ (?=[^<>]*(?:<|$))/s', $params['text'], $space_matches, PREG_OFFSET_CAPTURE);
+    $last_space_pos = !empty($space_matches[0]) ? end($space_matches[0])[1] : false;
+
+    if ($last_space_pos !== false) {
+        // Split the original text preserving HTML
+        $text_before = substr($params['text'], 0, $last_space_pos);
+        $text_after = substr($params['text'], $last_space_pos + 1);
+        return $text_before . ' <span class="' . esc_attr($params['class']) . '">' . $text_after . $svg . '</span>';
+    }
+
+    // Fallback: no space found, wrap everything
+    return '<span class="' . esc_attr($params['class']) . '">' . $params['text'] . $svg . '</span>';
 }
