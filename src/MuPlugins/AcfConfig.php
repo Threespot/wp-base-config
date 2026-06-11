@@ -18,7 +18,7 @@ class AcfConfig
     /**
      * Wire all ACF hooks. Called once from bootstrap.php.
      *
-     * Hooks all run under ACF's own namespace (`acf/init`, `acf/prepare_field`),
+     * Hooks all run under ACF's own namespace (`acf/init`, `acf/field_wrapper_attributes`),
      * so they're no-ops if ACF isn't installed.
      */
     public static function register(): void
@@ -26,7 +26,8 @@ class AcfConfig
         add_action('acf/init', [self::class, 'addOptionsPage']);
         add_filter('acf/fields/wysiwyg/toolbars', [self::class, 'customizeWysiwygToolbars']);
         add_action('acf/render_field_settings', [self::class, 'addHideLabelSetting']);
-        add_filter('acf/prepare_field', [self::class, 'maybeHideFieldLabel']);
+        add_filter('acf/field_wrapper_attributes', [self::class, 'addHideLabelClass'], 10, 2);
+        add_action('acf/input/admin_head', [self::class, 'printHideLabelCss']);
     }
 
     /**
@@ -96,17 +97,26 @@ class AcfConfig
     }
 
     /**
-     * Render a small inline <style> hiding a field's label when its
-     * "Hide Label?" setting is checked. Fires per-field during ACF's render.
+     * Add a marker class to a field's wrapper element when its
+     * "Hide Label?" setting is checked. Paired with printHideLabelCss().
      *
-     * `substr($field['key'], 6)` drops the leading `field_` from ACF's key,
-     * leaving the suffix ACF emits as the `.acf-field-<suffix>` CSS class.
+     * ACF's true_false setting stores 1/'1', not boolean true, so the
+     * check is truthiness, not strict equality.
      */
-    public static function maybeHideFieldLabel(array $field): array
+    public static function addHideLabelClass(array $wrapper, array $field): array
     {
-        if (array_key_exists('hide_label', $field) && $field['hide_label'] === true) {
-            echo '<style type="text/css">.acf-field-', esc_attr(substr($field['key'], 6)), ' > .acf-label > label {display: none;}</style>';
+        if (!empty($field['hide_label'])) {
+            $wrapper['class'] = trim(($wrapper['class'] ?? '') . ' threespot-hide-label');
         }
-        return $field;
+        return $wrapper;
+    }
+
+    /**
+     * Print the single CSS rule backing the "Hide Label?" marker class.
+     * Fires on every admin screen where ACF renders fields.
+     */
+    public static function printHideLabelCss(): void
+    {
+        echo '<style>.acf-field.threespot-hide-label > .acf-label > label {display: none;}</style>';
     }
 }

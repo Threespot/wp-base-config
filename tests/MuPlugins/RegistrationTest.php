@@ -139,7 +139,8 @@ class RegistrationTest extends BrainMonkeyTestCase
         $this->assertActionRegistered('acf/init', [AcfConfig::class, 'addOptionsPage']);
         $this->assertFilterRegistered('acf/fields/wysiwyg/toolbars', [AcfConfig::class, 'customizeWysiwygToolbars']);
         $this->assertActionRegistered('acf/render_field_settings', [AcfConfig::class, 'addHideLabelSetting']);
-        $this->assertFilterRegistered('acf/prepare_field', [AcfConfig::class, 'maybeHideFieldLabel']);
+        $this->assertFilterRegistered('acf/field_wrapper_attributes', [AcfConfig::class, 'addHideLabelClass']);
+        $this->assertActionRegistered('acf/input/admin_head', [AcfConfig::class, 'printHideLabelCss']);
     }
 
     public function test_theme_config_registers_expected_hooks(): void
