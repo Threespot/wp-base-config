@@ -117,6 +117,6 @@ class AcfConfig
      */
     public static function printHideLabelCss(): void
     {
-        echo '<style>.acf-field.threespot-hide-label > .acf-label > label {display: none;}</style>';
+        echo '<style>.acf-field.threespot-hide-label {padding-top: 0 !important} .acf-field.threespot-hide-label > .acf-label > label {display: none;}</style>';
     }
 }
