@@ -166,7 +166,8 @@ class AdminConfig
      * with no filter wired up, the URL is `null` and the enqueue is skipped.
      *
      *   - `all_css_url`    — enqueued on every admin page (no hook check).
-     *   - `fields_css_url` — enqueued only when `$hook` is in `fields_css_hooks`.
+     *   - `fields_css_url` — enqueued only when `$hook` is in `fields_css_hooks`,
+     *                        and never on the ACF field-group editor screen.
      */
     public static function enqueueAdminStyles(string $hook): void
     {
@@ -190,6 +191,15 @@ class AdminConfig
         $admin_css_fields_hooks = apply_filters('threespot/admin/fields_css_hooks', self::DEFAULT_FIELDS_CSS_HOOKS);
 
         if (!in_array($hook, $admin_css_fields_hooks, true)) {
+            return;
+        }
+
+        // Skip the ACF field-group editor screen — the fields stylesheet targets
+        // post/term edit forms, not the field-group builder, where it can clash
+        // with ACF's own admin UI.
+        $screen = get_current_screen();
+
+        if ($screen instanceof \WP_Screen && $screen->post_type === 'acf-field-group') {
             return;
         }
 
