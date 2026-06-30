@@ -353,9 +353,11 @@ in `dist/`.
 
 `vite.config.js` doesn't fit a pure-symlink pattern because each project
 needs its own `laravel-vite-plugin` inputs and Lando hostname. The package
-ships `dist/vite-base.js` exporting `threespotViteBase({plugins})` — a
+ships `dist/vite-base.js` exporting `threespotViteBase({plugins, ...options})` — a
 function that returns the stable Vite config (plugin options, aliases,
-esbuild, SVG sprite, server defaults).
+esbuild, SVG sprite, server defaults). It also accepts optional per-theme
+options: `jqueryPath` (host a local jQuery) and `staticCopyTargets` (extra
+files to copy verbatim into the build).
 
 The base intentionally has **no npm-package imports**. Vite's config-loader
 bundler (Rolldown in Vite 8+) follows the symlink to `vendor/` before any
@@ -382,6 +384,8 @@ import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { createSvgIconsPlugin } from 'vite-plugin-svg-icons';
 import eslint from 'vite-plugin-eslint';
 import stylelint from 'vite-plugin-stylelint';
+import browserslist from 'browserslist';
+import { browserslistToTargets, Features } from 'lightningcss';
 
 import { threespotViteBase } from './threespot-vite-base.js';
 
@@ -396,6 +400,15 @@ export default mergeConfig(
     createSvgIconsPlugin,
     eslint,
     stylelint,
+    browserslist,
+    browserslistToTargets,
+    Features,
+    // Optional: host a local jQuery. Path is relative to the theme's resources/
+    // dir; the file is copied to public/build/assets/resources/<path>. Pair it
+    // with a matching `threespot/assets/jquery_path` filter (see Asset URLs).
+    jqueryPath: 'scripts/lib/jquery-4.0.0.min.js',
+    // Optional: extra vite-plugin-static-copy targets, appended to the base set.
+    // staticCopyTargets: [{ src: 'resources/scripts/lib/widget.min.js', dest: 'assets' }],
   }),
   defineConfig({
     plugins: [
@@ -468,7 +481,7 @@ point of enqueue and the site supplies the URL.
 |---|---|---|
 | `threespot/admin/all_css_url`      | `AdminConfig::enqueueAdminStyles` | `null` (no stylesheet) — loaded on every admin page |
 | `threespot/admin/fields_css_url`   | `AdminConfig::enqueueAdminStyles` | `null` (no stylesheet) — loaded only on hooks in `fields_css_hooks` |
-| `threespot/assets/jquery_url`      | `AssetConfig::replaceJqueryIfConfigured` | `null` (don't override jQuery) |
+| `threespot/assets/jquery_path`     | `AssetConfig::replaceJqueryIfConfigured` | `null` (use WP core jQuery) — resources/-relative path; the URL is derived from the Vite static-copy output (pair with the `jqueryPath` Vite option) |
 | `threespot/blocks/editor_css_urls` | `BlockConfig::addEditorStyles`    | `[]` (no stylesheets) — array of URLs loaded into the editor canvas in order |
 | `threespot/blocks/editor_js_urls`  | `BlockConfig::enqueueEditorAssets` | `[]` (no JS bundles) — array of URLs output as `<script type="module">` tags in order |
 | `threespot/login/css_url`          | `LoginConfig`                | `null` (no stylesheet) |

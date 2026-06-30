@@ -31,6 +31,15 @@ export function threespotViteBase({
   browserslist,
   browserslistToTargets,
   Features,
+  // Theme-supplied options:
+  //   jqueryPath        — path (relative to the theme's resources/ dir) to a
+  //                       local jQuery to copy + host, e.g.
+  //                       'scripts/lib/jquery-4.0.0.min.js'. Omit to skip jQuery
+  //                       hosting (AssetConfig leaves core jQuery in place).
+  //   staticCopyTargets — extra vite-plugin-static-copy targets to append, e.g.
+  //                       [{ src: 'resources/scripts/lib/foo.js', dest: 'assets' }].
+  jqueryPath,
+  staticCopyTargets = [],
 }) {
   // Suppress vite-plugin-eslint's "LintOnStart is turned on" notice — it
   // just restates the option set right here in this file.
@@ -61,8 +70,16 @@ export function threespotViteBase({
         targets: [
           { src: 'resources/images', dest: 'assets' },
           { src: 'resources/fonts', dest: 'assets' },
-          // Local jQuery copied to public/build/ for AssetConfig::replaceJqueryIfConfigured
-          { src: 'resources/scripts/lib/jquery-3.7.1.min.js', dest: '' },
+          // Optional local jQuery. The theme passes a path relative to its
+          // resources/ dir (e.g. 'scripts/lib/jquery-4.0.0.min.js'); we copy it to
+          // public/build/assets/resources/<path> — vite-plugin-static-copy preserves
+          // the src dir structure under dest. AssetConfig::replaceJqueryIfConfigured()
+          // derives the matching URL from the 'threespot/assets/jquery_path' filter.
+          ...(jqueryPath
+            ? [{ src: `resources/${jqueryPath}`, dest: 'assets' }]
+            : []),
+          // Extra theme-supplied static-copy targets
+          ...staticCopyTargets,
         ],
       }),
       // SVG sprite plugin — requires `import 'virtual:svg-icons-register'` in main.js

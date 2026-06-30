@@ -9,7 +9,10 @@ namespace Threespot\Wp\MuPlugins;
  * this module only owns site-wide deferral policy and shared script behavior.
  *
  * Filters:
- *   threespot/assets/jquery_url               — string|null URL to a locally-hosted jQuery (null disables override)
+ *   threespot/assets/jquery_path              — string|null theme resources/-relative path to a locally-hosted jQuery
+ *                                                (e.g. 'scripts/lib/jquery-4.0.0.min.js'). Null leaves WP core jQuery in
+ *                                                place; otherwise the URL is derived from the theme's public/build/assets
+ *                                                output.
  *   threespot/assets/jquery_version           — string (default null — no explicit version)
  *   threespot/assets/do_not_defer_scripts     — array<string> script handles to skip when adding defer
  *   threespot/assets/module_script_handles    — array<string> handles that should also get type="module"
@@ -77,8 +80,14 @@ class AssetConfig
     }
 
     /**
-     * If the site provides a local jQuery URL, deregister core jQuery and replace it.
+     * If the theme provides a local jQuery path, deregister core jQuery and replace it.
      * Loads at end of body — https://core.trac.wordpress.org/ticket/37110#comment:82
+     *
+     * The `threespot/assets/jquery_path` filter supplies a path relative to the theme's
+     * resources/ dir (e.g. 'scripts/lib/jquery-4.0.0.min.js'). The URL is derived from
+     * the Vite static-copy output at public/build/assets/resources/<path> — see the
+     * matching `jqueryPath` option in the shared Vite config (dist/vite-base.js), which
+     * copies the file there. Null leaves WP core jQuery in place.
      */
     public static function replaceJqueryIfConfigured(): void
     {
@@ -86,11 +95,15 @@ class AssetConfig
             return;
         }
 
-        $jquery_url = apply_filters('threespot/assets/jquery_url', null);
+        $jquery_path = apply_filters('threespot/assets/jquery_path', null);
 
-        if (empty($jquery_url)) {
+        if (empty($jquery_path)) {
             return;
         }
+
+        // get_theme_file_uri() resolves against the content dir (no /wp prefix in
+        // Bedrock) and respects child themes.
+        $jquery_url = get_theme_file_uri('public/build/assets/resources/' . ltrim($jquery_path, '/'));
 
         $version = apply_filters('threespot/assets/jquery_version', null);
 
