@@ -176,6 +176,11 @@ class BlockConfig
      */
     public static function customizeBlockMarkup(string $block_content, array $block): string
     {
+        // Accordion: add u-richtext to panel wrapper (admin needs manual style in gutenberg.scss)
+        if ($block['blockName'] === 'core/accordion') {
+            $block_content = str_replace('wp-block-accordion-panel ', 'wp-block-accordion-panel u-richtext ', $block_content);
+        }
+
         // Heading: <h1> → <h2> for accessibility (page title is the only <h1>)
         // https://github.com/WordPress/gutenberg/issues/15160#issuecomment-908586929
         if ($block['blockName'] === 'core/heading') {
