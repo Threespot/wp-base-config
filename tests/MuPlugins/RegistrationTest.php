@@ -189,6 +189,7 @@ class RegistrationTest extends BrainMonkeyTestCase
         $this->assertFilterRegistered('robots_txt', [AdminConfig::class, 'customizeRobotsTxt']);
         $this->assertFilterRegistered('register_taxonomy_args', [AdminConfig::class, 'hideTaxonomiesFromNavMenus']);
         $this->assertFilterRegistered('upload_mimes', [AdminConfig::class, 'allowSvgUploads']);
+        $this->assertFilterRegistered('option_wpseo', [AdminConfig::class, 'hideYoastSearchEnginesDiscouragedNotice']);
 
         // Top-level side effects
         $this->assertFilterRegistered('admin_footer_text', '__return_null');

@@ -155,6 +155,8 @@ class AdminConfig
 
         // Allow SVG uploads (moved from svg-helpers in the legacy theme)
         add_filter('upload_mimes', [self::class, 'allowSvgUploads']);
+
+        add_filter('option_wpseo', [self::class, 'hideYoastSearchEnginesDiscouragedNotice']);
     }
 
     /**
@@ -543,6 +545,32 @@ class AdminConfig
         }
 
         return $args;
+    }
+
+    /**
+     * Hide Yoast's "Huge SEO Issue: You're blocking access to robots." notice
+     * on non-live environments, where search engines are intentionally discouraged.
+     *
+     * Filter callback for WP's `option_wpseo`. Yoast suppresses the notice when
+     * `ignore_search_engines_discouraged_notice` is set in its `wpseo` option
+     * (the same flag its dismiss link sets), so forcing it on at read time hides
+     * the notice without writing to the database — important because local DBs
+     * are regularly overwritten by `lando pull`.
+     *
+     * @param mixed $value The `wpseo` option value.
+     * @return mixed
+     */
+    public static function hideYoastSearchEnginesDiscouragedNotice($value)
+    {
+        if (!isset($_ENV['PANTHEON_ENVIRONMENT']) || $_ENV['PANTHEON_ENVIRONMENT'] === 'live') {
+            return $value;
+        }
+
+        if (is_array($value)) {
+            $value['ignore_search_engines_discouraged_notice'] = true;
+        }
+
+        return $value;
     }
 
     /**
