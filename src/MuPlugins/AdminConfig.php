@@ -130,33 +130,28 @@ class AdminConfig
     public static function register(): void
     {
         add_action('admin_enqueue_scripts', [self::class, 'enqueueAdminStyles']);
-        add_action('wp_dashboard_setup', [self::class, 'removeDashboardWidgets']);
-        add_action('admin_menu', [self::class, 'removeMenuPages']);
-        add_action('admin_init', [self::class, 'disableCommentsAndRedirect'], 11);
         add_action('admin_init', [self::class, 'collapseClosedMetaboxes']);
-        add_action('wp_before_admin_bar_render', [self::class, 'customizeAdminBar'], 99);
-        add_filter('admin_footer_text', '__return_null');
+        add_action('admin_init', [self::class, 'disableCommentsAndRedirect'], 11);
+        add_action('admin_menu', [self::class, 'removeMenuPages']);
         add_action('customize_register', [self::class, 'removeCustomizerSections'], 50);
-        add_action('restrict_manage_posts', [self::class, 'addAuthorFilter']);
-        add_filter('wpseo_metabox_prio', [self::class, 'lowerYoastMetaboxPriority']);
         add_action('init', [self::class, 'removeUserRoles']);
-        add_filter('tiny_mce_before_init', [self::class, 'customizeTinyMce']);
+        add_action('restrict_manage_posts', [self::class, 'addAuthorFilter']);
+        add_action('user_register', [self::class, 'setDefaultScreenOptions']);
+        add_action('wp_before_admin_bar_render', [self::class, 'customizeAdminBar'], 99);
+        add_action('wp_dashboard_setup', [self::class, 'removeDashboardWidgets']);
+
+        add_filter('admin_footer_text', '__return_null');// remove admin footer text
+        add_filter('option_wpseo', [self::class, 'hideYoastSearchEnginesDiscouragedNotice']);
+        add_filter('register_taxonomy_args', [self::class, 'hideTaxonomiesFromNavMenus'], 10, 2);
+        add_filter('robots_txt', [self::class, 'customizeRobotsTxt'], 100000, 2);
         add_filter('site_status_tests', [self::class, 'removeSiteStatusTests']);
+        add_filter('tiny_mce_before_init', [self::class, 'customizeTinyMce']);
+        add_filter('upload_mimes', [self::class, 'allowSvgUploads']);
+        add_filter('wpseo_metabox_prio', [self::class, 'lowerYoastMetaboxPriority']);
+        add_filter('xmlrpc_enabled', '__return_false');// disable XML-RPC https://kinsta.com/blog/xmlrpc-php/
 
         // Remove WP version from <head>
         remove_action('wp_head', 'wp_generator');
-
-        // Disable XML-RPC — https://kinsta.com/blog/xmlrpc-php/
-        add_filter('xmlrpc_enabled', '__return_false');
-
-        add_action('user_register', [self::class, 'setDefaultScreenOptions']);
-        add_filter('robots_txt', [self::class, 'customizeRobotsTxt'], 100000, 2);
-        add_filter('register_taxonomy_args', [self::class, 'hideTaxonomiesFromNavMenus'], 10, 2);
-
-        // Allow SVG uploads (moved from svg-helpers in the legacy theme)
-        add_filter('upload_mimes', [self::class, 'allowSvgUploads']);
-
-        add_filter('option_wpseo', [self::class, 'hideYoastSearchEnginesDiscouragedNotice']);
     }
 
     /**
