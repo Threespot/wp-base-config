@@ -150,6 +150,7 @@ export function threespotViteBase({
     server: {
       host: '0.0.0.0',
       port: 5173,
+      // NOTE: Starting in Vite 8.1 `hmr` is replaced with `ws`
       hmr: {
         protocol: 'wss',
       },
