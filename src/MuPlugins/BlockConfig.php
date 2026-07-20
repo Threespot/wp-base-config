@@ -35,6 +35,9 @@ class BlockConfig
         add_action('init', [self::class, 'addPatternCategory'], 10);
         add_action('init', [self::class, 'unregisterBlockBindingsSources'], 100);
         add_filter('the_content', [self::class, 'stripEmptyParagraphs']);
+        // Priority 20: ACF registers wpautop on acf_the_content at priority 10 when the
+        // plugin loads (after mu-plugins), so at 10 this would run before wpautop.
+        add_filter('acf_the_content', [self::class, 'stripEmptyParagraphs'], 20);
         add_filter('wp_content_img_tag', [self::class, 'stripAutoSizesFromContent']);
         add_filter('wp_get_attachment_image_attributes', [self::class, 'stripAutoSizesFromAttachment']);
         add_filter('register_block_type_args', [self::class, 'disableHeadingLevels'], 10, 2);
@@ -117,13 +120,17 @@ class BlockConfig
     }
 
     /**
-     * Strip empty <p> and <p class=""></p> from post content.
+     * Strip empty paragraphs from post content and ACF wysiwyg output.
+     *
+     * Catches Gutenberg's <p></p> / <p class=""></p> plus the TinyMCE-style
+     * empties wpautop produces from ACF wysiwyg fields: <p>&nbsp;</p>,
+     * whitespace-only, and <p><br></p>.
      *
      * CSS could hide them, but they still affect first/last/nth-child selectors.
      */
     public static function stripEmptyParagraphs(string $content): string
     {
-        return preg_replace('/<p(?: class="")?><\/p>/', '', $content);
+        return preg_replace('/<p(?: class="")?>(?:\s|&nbsp;|<br ?\/?>)*<\/p>/', '', $content);
     }
 
     /**

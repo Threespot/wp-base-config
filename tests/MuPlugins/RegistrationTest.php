@@ -165,6 +165,7 @@ class RegistrationTest extends BrainMonkeyTestCase
         $this->assertActionRegistered('init', [BlockConfig::class, 'addPatternCategory']);
         $this->assertActionRegistered('init', [BlockConfig::class, 'unregisterBlockBindingsSources']);
         $this->assertFilterRegistered('the_content', [BlockConfig::class, 'stripEmptyParagraphs']);
+        $this->assertFilterRegistered('acf_the_content', [BlockConfig::class, 'stripEmptyParagraphs']);
         $this->assertFilterRegistered('wp_content_img_tag', [BlockConfig::class, 'stripAutoSizesFromContent']);
         $this->assertFilterRegistered('wp_get_attachment_image_attributes', [BlockConfig::class, 'stripAutoSizesFromAttachment']);
         $this->assertFilterRegistered('register_block_type_args', [BlockConfig::class, 'disableHeadingLevels']);
