@@ -206,11 +206,6 @@ class BlockConfig
             $block_content = str_replace('<img', '<img loading="lazy"', $block_content);
         }
 
-        // Details: add u-richtext
-        if ($block['blockName'] === 'core/details') {
-            $block_content = str_replace('wp-block-details ', 'wp-block-details u-richtext ', $block_content);
-        }
-
         // File: hide embed, add file info to button
         if ($block['blockName'] === 'core/file') {
             // Hide inaccessible PDF viewer from screen readers

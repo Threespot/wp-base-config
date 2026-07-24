@@ -24,9 +24,12 @@ wp.domReady(() => {
     'blocks.getBlockDefaultClassName',
     'threespot/set-block-custom-class-name',
     (className, blockName) => {
-      // Add “u-richtext” class to blocks that support rich text
-      // Note: Media & Text and Cover require adding “u-richtext” to a child div
-      //       — handled in setup.php via add_filter('render_block')
+      // Add "u-richtext" class to blocks that support inner blocks
+      // Note: If you need to add "u-richtext" to a child element,
+      //       (e.g. Media & Text, Cover) that can be done via PHP in
+      //       `customizeBlockMarkup()` in /src/MuPlugins/BlockConfig.php
+      //
+      add_filter('render_block')
       const richtextBlocks = [
         'core/column',
         'core/details',
