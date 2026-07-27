@@ -28,8 +28,6 @@ wp.domReady(() => {
       // Note: If you need to add "u-richtext" to a child element,
       //       (e.g. Media & Text, Cover) that can be done via PHP in
       //       `customizeBlockMarkup()` in /src/MuPlugins/BlockConfig.php
-      //
-      add_filter('render_block')
       const richtextBlocks = [
         'core/column',
         'core/details',
