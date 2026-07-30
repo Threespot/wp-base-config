@@ -190,6 +190,64 @@ add_filter('threespot/admin/is_internal_user', function ($is_internal, $user) {
 }, 10, 2);
 ```
 
+### Comments
+
+The package's stance is **comments off site-wide**, re-enabled per post type.
+`AdminConfig::disableCommentSupport()` strips `comments` and `trackbacks`
+support from every post type returned by `get_custom_post_types()` (which
+includes `post` and `page`), the Comments menu page and admin-bar node are
+removed, and `edit-comments.php` redirects to the dashboard.
+
+> **⚠️ This writes to the database.** Removing `comments` support changes what
+> WordPress *saves*, not just what the admin shows. `get_default_comment_status()`
+> returns `'closed'` for any post type without comment support — ignoring your
+> `default_comment_status` option — and that value is stored in
+> `wp_posts.comment_status` on every post as it is created.
+>
+> **The value persists.** Re-enabling comments later does **not** reopen posts
+> that were created while comments were off. Those rows need a database repair.
+
+To re-enable comments for one post type:
+
+```php
+threespot_enable_comments('post');
+```
+
+To re-enable comments site-wide — this empties the disable list, stops the
+`edit-comments.php` redirect, and restores the Comments menu page and admin-bar
+node in one call:
+
+```php
+threespot_enable_comments();
+```
+
+Both are variadic and both only affect posts created from that point on.
+
+One core quirk to know about: `get_default_comment_status()` hardcodes
+`'closed'` for the `page` post type *before* it checks support, so pages are
+saved closed on stock WordPress too. `threespot_enable_comments('page')` restores
+the comment metabox but does not change what gets written at creation — you also
+need `add_filter('get_default_comment_status', ...)` for that.
+
+To
+reopen content that was already saved closed, repair the rows directly. Check
+the damage first:
+
+```bash
+wp post list --post_type=post --comment_status=closed --format=count
+```
+
+Then, once you're satisfied that's the set you want reopened:
+
+```bash
+wp db query "UPDATE wp_posts SET comment_status = 'open' \
+  WHERE post_type = 'post' AND post_status = 'publish' AND comment_status = 'closed';"
+```
+
+Scope the `WHERE` clause deliberately — it cannot distinguish posts closed by
+this package from posts an editor closed on purpose. Back up before running it
+on production, and note that Pantheon's table prefix may not be `wp_`.
+
 ### Calling helper functions from templates
 
 Helpers live in the `Threespot\Wp\Helpers` namespace. Import once and use
@@ -495,9 +553,9 @@ point of enqueue and the site supplies the URL.
 | `threespot/acf/options_page_title`        | `'Theme Settings'`          | ACF options page title |
 | `threespot/acf/wysiwyg_toolbars`          | `[]`                        | Additional custom toolbars merged on top of defaults |
 | `threespot/admin/allow_svg_uploads`       | `true`                      | Adds `image/svg+xml` to `upload_mimes` |
-| `threespot/admin/disable_comments_post_types` | `get_custom_post_types()` | Post types stripped of comment support |
 | `threespot/admin/fields_css_hooks`        | (dashboard, edit, post hooks) | Admin hooks where `fields_css_url` is enqueued |
 | `threespot/admin/is_internal_user`        | `false`                     | Predicate `fn($_, $user) => bool`. Receives current `WP_User`. |
+| `threespot/admin/redirect_comments_screen` | `true`                     | Redirects `edit-comments.php` to the dashboard. See [Comments](#comments). |
 | `threespot/admin/screen_options_per_page` | `50`                        | Default screen-options page size for new users |
 | `threespot/admin/tinymce_body_class`      | `'u-richtext'`              | TinyMCE iframe body class |
 | `threespot/assets/disable_oembed_discovery` | `true`                    | Strips `<link rel="alternate" type="application/json+oembed">` |
@@ -530,6 +588,7 @@ defaults match the legacy theme's behavior.
 | `threespot/admin/closed_metaboxes` | `threespot_collapse_metabox` / `threespot_uncollapse_metabox` | `ame-cpe-content-permissions`, `wpseo_meta` |
 | `threespot/admin/customizer_sections_removed` | `threespot_keep_customizer_section` / `threespot_remove_customizer_section` | `colors`, `custom_css`, `static_front_page` |
 | `threespot/admin/dashboard_widgets_removed` | `threespot_keep_dashboard_widget` / `threespot_remove_dashboard_widget` | `welcome_panel`, `dashboard_primary`, `dashboard_quick_press`, `dashboard_secondary`, `wpseo-dashboard-overview` |
+| `threespot/admin/disable_comments_post_types` | `threespot_enable_comments` / `threespot_disable_comments` | `get_custom_post_types()` — includes `post` and `page`. **Has a persistent `comment_status` side effect — see [Comments](#comments).** |
 | `threespot/admin/menu_pages_removed` | `threespot_keep_menu_page` / `threespot_remove_menu_page` | `edit-comments.php` |
 | `threespot/admin/screen_options_hidden_columns` | `threespot_hide_screen_options_column` / `threespot_show_screen_options_column` | Yoast columns (`wpseo-focuskw`, etc.) |
 | `threespot/admin/site_status_tests_removed` | — (use raw filter) | `async.background_updates`, `direct.available_updates_disk_space`, `direct.theme_version`, `direct.update_temp_backup_writable` |
@@ -543,6 +602,11 @@ defaults match the legacy theme's behavior.
 is NOT stripped). `remove_*` adds an item to the list. `threespot_defer_script` /
 `threespot_no_defer_script` follow the same shape: the list is "scripts NOT to
 defer", so `no_defer_script` adds to it and `defer_script` removes from it.
+`threespot_enable_comments` / `threespot_disable_comments` likewise: the list is
+"post types with comments stripped", so `disable_comments` adds to it and
+`enable_comments` removes from it. `threespot_enable_comments()` with no
+arguments is a special case — it clears the list *and* restores the rest of the
+comments UI.
 
 ## Helper function reference
 
@@ -612,6 +676,7 @@ entries narrow so real secrets are never masked.
 ```
 threespot/wp-base-config/
 ├── composer.json                                # type: library
+├── UPGRADING.md                                 # breaking changes to filters / public names / unhookable callbacks
 ├── bootstrap.php                                # registers all MU-plugin modules
 ├── mu-plugins/
 │   └── threespot-wp-base-config.php             # WP loader; symlink into web/app/mu-plugins/
@@ -654,5 +719,12 @@ Each `MuPlugins/*Config::register()` registers named static-method callbacks
 so a site can fully disable any individual behavior with `remove_action`:
 
 ```php
-remove_action('admin_init', ['Threespot\Wp\MuPlugins\AdminConfig', 'disableCommentsAndRedirect'], 11);
+remove_action('wp_loaded', ['Threespot\Wp\MuPlugins\AdminConfig', 'disableCommentSupport']);
 ```
+
+Prefer the public API where a pair exists, though — for this example,
+`threespot_enable_comments()` is the supported route (see [Comments](#comments)).
+Unhooking is the escape hatch for behaviors that have no helper.
+
+Renames to these callback names are breaking changes for any site that unhooks
+them. See [UPGRADING.md](UPGRADING.md).

@@ -174,6 +174,64 @@ if (!function_exists('threespot_keep_menu_page')) {
 }
 
 /* -------------------------------------------------------------------------
+ * Comments
+ *
+ * The package disables comments site-wide by default. These helpers are the
+ * supported way back — reach for them rather than unhooking
+ * AdminConfig::disableCommentSupport().
+ *
+ * IMPORTANT: enabling comments for a post type only affects posts created
+ * from that point on. Posts already saved with comment_status = 'closed' stay
+ * closed and need a database repair — see "Comments" in README.md.
+ * ------------------------------------------------------------------------- */
+
+if (!function_exists('threespot_enable_comments')) {
+    /**
+     * Re-enable comments.
+     *
+     * With post types, this takes them OFF the disable list so they keep their
+     * `comments` support:
+     *
+     *   threespot_enable_comments('post');
+     *
+     * With NO arguments, it re-enables comments site-wide — empties the disable
+     * list, stops the edit-comments.php redirect, and restores the Comments
+     * menu page and admin-bar node. This is the one-call replacement for the
+     * three-filter override the package used to require.
+     */
+    function threespot_enable_comments(string ...$post_types): void
+    {
+        if ($post_types !== []) {
+            threespot_keep_in_list('threespot/admin/disable_comments_post_types', $post_types);
+            return;
+        }
+
+        add_filter('threespot/admin/disable_comments_post_types', function () {
+            return [];
+        });
+        add_filter('threespot/admin/redirect_comments_screen', function () {
+            return false;
+        });
+        threespot_keep_menu_page('edit-comments.php');
+        threespot_keep_admin_bar_node('comments');
+    }
+}
+
+if (!function_exists('threespot_disable_comments')) {
+    /**
+     * Add post types to the comment-disabling list. Only needed for post types
+     * that aren't already covered by the default (`get_custom_post_types()`),
+     * or to re-disable one after a site-wide `threespot_enable_comments()`.
+     *
+     * Note the persistent comment_status side effect documented above.
+     */
+    function threespot_disable_comments(string ...$post_types): void
+    {
+        threespot_remove_from_list('threespot/admin/disable_comments_post_types', $post_types);
+    }
+}
+
+/* -------------------------------------------------------------------------
  * Default-collapsed metaboxes
  * ------------------------------------------------------------------------- */
 
