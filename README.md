@@ -55,13 +55,18 @@ by `config/application.php`).
 ```jsonc
 {
   "require": {
-    "threespot/wp-base-config": "^0.1"
+    "threespot/wp-base-config": "^0.2"
   },
   "repositories": [
     { "type": "vcs", "url": "https://github.com/threespot/wp-base-config" }
   ]
 }
 ```
+
+Note that Composer special-cases the caret operator below 1.0: `^0.2` means
+`>=0.2.0 <0.3.0`, so it pins the minor. Sites already on `^0.1` stay there until
+the constraint is changed by hand — see [UPGRADING.md](UPGRADING.md) before
+moving one across a minor.
 
 Then `composer update threespot/wp-base-config`. The helper functions and
 public API are now autoloaded on every request — they work immediately.
