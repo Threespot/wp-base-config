@@ -9,7 +9,27 @@ agent can be pointed at this file and asked to bring a site up to date.
 
 ---
 
-## 0.1.10 → 0.1.11
+## 0.1.10 → 0.2.0
+
+**Why a minor bump and not a patch.** Composer's caret operator is
+special-cased for `0.y.z` releases: `^0.1.6` resolves to `>=0.1.6 <0.2.0`, so a
+`0.1.11` tag would install on the next `composer update` for every site pinning
+`^0.1`. This release renames a public callback in a way that fails *silently*
+(see below), and the package has no way to warn — `remove_action()` on a
+callback that no longer exists is a no-op, so there is no deprecation shim
+possible. The version bump is the only enforcement mechanism available: `0.2.0`
+falls outside `^0.1`, so nothing moves until someone deliberately changes the
+constraint to `^0.2`, which is the point at which this file gets read.
+
+**Bump the constraint deliberately, not reflexively.** Read the action-required
+steps below *first*, then:
+
+```jsonc
+"threespot/wp-base-config": "^0.2"
+```
+
+At least one site in the fleet uses the old `remove_action()` opt-out, so this
+migration is required in practice, not hypothetical.
 
 ### `AdminConfig::disableCommentsAndRedirect()` was split in two
 
