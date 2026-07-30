@@ -182,6 +182,7 @@ class RegistrationTest extends BrainMonkeyTestCase
         $this->assertActionRegistered('admin_enqueue_scripts', [AdminConfig::class, 'enqueueAdminStyles']);
         $this->assertActionRegistered('wp_dashboard_setup', [AdminConfig::class, 'removeDashboardWidgets']);
         $this->assertActionRegistered('admin_menu', [AdminConfig::class, 'removeMenuPages']);
+        $this->assertActionRegistered('admin_init', [AdminConfig::class, 'redirectCommentsScreen']);
         $this->assertActionRegistered('wp_before_admin_bar_render', [AdminConfig::class, 'customizeAdminBar']);
         $this->assertActionRegistered('customize_register', [AdminConfig::class, 'removeCustomizerSections']);
         $this->assertActionRegistered('init', [AdminConfig::class, 'removeUserRoles']);
@@ -191,6 +192,19 @@ class RegistrationTest extends BrainMonkeyTestCase
         $this->assertFilterRegistered('register_taxonomy_args', [AdminConfig::class, 'hideTaxonomiesFromNavMenus']);
         $this->assertFilterRegistered('upload_mimes', [AdminConfig::class, 'allowSvgUploads']);
         $this->assertFilterRegistered('option_wpseo', [AdminConfig::class, 'hideYoastSearchEnginesDiscouragedNotice']);
+
+        // Comment support is stripped on wp_loaded, NOT admin_init — admin_init
+        // never fires under WP-CLI / REST / the front end, which made the
+        // persistent comment_status side effect invisible outside the editor.
+        $this->assertActionRegistered('wp_loaded', [AdminConfig::class, 'disableCommentSupport']);
+
+        // Guards the rename documented in UPGRADING.md: sites opting out via
+        // remove_action(... 'disableCommentsAndRedirect') must not find a
+        // half-restored method here.
+        $this->assertFalse(
+            method_exists(AdminConfig::class, 'disableCommentsAndRedirect'),
+            'disableCommentsAndRedirect was split into disableCommentSupport + redirectCommentsScreen',
+        );
 
         // Top-level side effects
         $this->assertFilterRegistered('admin_footer_text', '__return_null');

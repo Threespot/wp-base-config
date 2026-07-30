@@ -32,7 +32,10 @@ use function Threespot\Wp\Helpers\get_custom_post_types;
  *   threespot/admin/is_internal_user                — bool predicate, default false
  *   threespot/admin/screen_options_per_page         — int (default 50)
  *   threespot/admin/tinymce_body_class              — string (default 'u-richtext')
- *   threespot/admin/disable_comments_post_types     — array<string> post types to strip comment support from
+ *   threespot/admin/disable_comments_post_types     — array<string> post types to strip comment support from.
+ *                                                     NOTE: has a persistent data side effect — see
+ *                                                     disableCommentSupport() below.
+ *   threespot/admin/redirect_comments_screen        — bool (default true) redirect edit-comments.php to the dashboard
  *   threespot/admin/allow_svg_uploads               — bool (default true)
  */
 class AdminConfig
@@ -131,7 +134,7 @@ class AdminConfig
     {
         add_action('admin_enqueue_scripts', [self::class, 'enqueueAdminStyles']);
         add_action('admin_init', [self::class, 'collapseClosedMetaboxes']);
-        add_action('admin_init', [self::class, 'disableCommentsAndRedirect'], 11);
+        add_action('admin_init', [self::class, 'redirectCommentsScreen'], 11);
         add_action('admin_menu', [self::class, 'removeMenuPages']);
         add_action('customize_register', [self::class, 'removeCustomizerSections'], 50);
         add_action('init', [self::class, 'removeUserRoles']);
@@ -139,6 +142,8 @@ class AdminConfig
         add_action('user_register', [self::class, 'setDefaultScreenOptions']);
         add_action('wp_before_admin_bar_render', [self::class, 'customizeAdminBar'], 99);
         add_action('wp_dashboard_setup', [self::class, 'removeDashboardWidgets']);
+        // `wp_loaded`, not `admin_init` — see disableCommentSupport() for why.
+        add_action('wp_loaded', [self::class, 'disableCommentSupport']);
 
         add_filter('admin_footer_text', '__return_null');// remove admin footer text
         add_filter('option_wpseo', [self::class, 'hideYoastSearchEnginesDiscouragedNotice']);
@@ -241,18 +246,32 @@ class AdminConfig
     }
 
     /**
-     * Disable comment support on every custom post type and redirect anyone
-     * who manually navigates to the comments admin screen.
+     * Strip `comments` (and `trackbacks`) support from the post types listed by
+     * the `disable_comments_post_types` filter. The package's stance is
+     * comments-off site-wide; re-enable per post type with
+     * `threespot_enable_comments('post')`.
      *
-     * `is_admin()` guards against accidentally running on the front end —
-     * `admin_init` is admin-only, but a defensive check costs nothing.
+     * PERSISTENT DATA SIDE EFFECT — read before changing this method.
+     *
+     * Removing `comments` support changes what core WRITES at post creation,
+     * not just what the admin UI shows. `get_default_comment_status()` returns
+     * `'closed'` for any post type that doesn't support comments, ignoring the
+     * `default_comment_status` option, and that value is saved to
+     * `wp_posts.comment_status` per post. It persists after support is restored
+     * — re-enabling comments later does NOT reopen already-created posts; they
+     * need a database repair (see "Comments" in README.md).
+     *
+     * Runs on `wp_loaded` rather than `admin_init` deliberately. `wp_loaded`
+     * fires after all of `init` (so every CPT is registered) and before any
+     * wp-admin file runs, so the admin outcome is unchanged — but it ALSO fires
+     * under WP-CLI, REST, and on the front end, which `admin_init` does not.
+     * Under the old `admin_init` registration `post_type_supports()` reported
+     * `true` on the CLI and front end while the editor was quietly saving posts
+     * closed, which made the side effect above very hard to diagnose. Keep this
+     * on a hook that fires in every context.
      */
-    public static function disableCommentsAndRedirect(): void
+    public static function disableCommentSupport(): void
     {
-        if (!is_admin()) {
-            return;
-        }
-
         $post_types = apply_filters('threespot/admin/disable_comments_post_types', get_custom_post_types());
 
         foreach ($post_types as $post_type) {
@@ -261,9 +280,29 @@ class AdminConfig
                 remove_post_type_support($post_type, 'trackbacks');
             }
         }
+    }
 
-        // Redirect anyone hitting the comments admin page
-        // https://gist.github.com/mattclements/eab5ef656b2f946c4bfb
+    /**
+     * Redirect anyone who manually navigates to the comments admin screen back
+     * to the dashboard. Gated behind `redirect_comments_screen` so a site that
+     * wants comments can reach the screen without unhooking comment disabling
+     * as well.
+     *
+     * `is_admin()` guards against accidentally running on the front end —
+     * `admin_init` is admin-only, but a defensive check costs nothing.
+     *
+     * @link https://gist.github.com/mattclements/eab5ef656b2f946c4bfb
+     */
+    public static function redirectCommentsScreen(): void
+    {
+        if (!is_admin()) {
+            return;
+        }
+
+        if (!apply_filters('threespot/admin/redirect_comments_screen', true)) {
+            return;
+        }
+
         global $pagenow;
         if ($pagenow === 'edit-comments.php') {
             wp_safe_redirect(admin_url());

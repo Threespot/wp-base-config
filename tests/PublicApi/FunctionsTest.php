@@ -43,6 +43,21 @@ class FunctionsTest extends BrainMonkeyTestCase
         return $value;
     }
 
+    /**
+     * As applyCapturedFilters, but for scalar filters (bool, string, int).
+     *
+     * @param mixed $initial
+     * @return mixed
+     */
+    private function applyCapturedFilterValue(string $filter, $initial)
+    {
+        $value = $initial;
+        foreach ($this->captured[$filter] ?? [] as $cb) {
+            $value = $cb($value);
+        }
+        return $value;
+    }
+
     /* ---------------- Dashboard widgets ---------------- */
 
     public function test_remove_dashboard_widget_adds_to_removal_list(): void
@@ -163,6 +178,62 @@ class FunctionsTest extends BrainMonkeyTestCase
 
         $result = $this->applyCapturedFilters('threespot/admin/menu_pages_removed', ['edit-comments.php']);
         $this->assertSame([], $result);
+    }
+
+    /* ---------------- Comments ---------------- */
+
+    public function test_enable_comments_for_named_post_types(): void
+    {
+        threespot_enable_comments('post', 'page');
+
+        $result = $this->applyCapturedFilters('threespot/admin/disable_comments_post_types', [
+            'post',
+            'page',
+            'news',
+        ]);
+
+        $this->assertSame(['news'], $result);
+    }
+
+    public function test_disable_comments_adds_post_types(): void
+    {
+        threespot_disable_comments('event');
+
+        $result = $this->applyCapturedFilters('threespot/admin/disable_comments_post_types', ['post']);
+
+        $this->assertContains('post', $result);
+        $this->assertContains('event', $result);
+    }
+
+    public function test_enable_comments_with_no_args_clears_the_whole_disable_list(): void
+    {
+        threespot_enable_comments();
+
+        $result = $this->applyCapturedFilters('threespot/admin/disable_comments_post_types', [
+            'post',
+            'page',
+            'news',
+        ]);
+
+        $this->assertSame([], $result);
+    }
+
+    public function test_enable_comments_with_no_args_also_restores_the_comments_ui(): void
+    {
+        threespot_enable_comments();
+
+        // The redirect stops...
+        $this->assertFalse($this->applyCapturedFilterValue('threespot/admin/redirect_comments_screen', true));
+
+        // ...and the menu page + admin-bar node come back off their removal lists.
+        $this->assertSame(
+            [],
+            $this->applyCapturedFilters('threespot/admin/menu_pages_removed', ['edit-comments.php']),
+        );
+        $this->assertSame(
+            [],
+            $this->applyCapturedFilters('threespot/admin/admin_bar_nodes_removed', ['comments']),
+        );
     }
 
     /* ---------------- Closed metaboxes ---------------- */
