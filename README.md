@@ -91,6 +91,25 @@ ls -la web/app/mu-plugins/threespot-wp-base-config.php
 lando wp eval 'echo class_exists("Threespot\\Wp\\MuPlugins\\AdminConfig") ? "OK\n" : "missing\n";'
 ```
 
+### 3. (Optional) Copy any standalone drop-in mu-plugins
+
+Alongside the loader, `mu-plugins/` carries self-contained mu-plugins that
+are **not** wired into `bootstrap.php`. Each one is opt-in: copy the file
+into `web/app/mu-plugins/` on sites that need it. Copy rather than symlink —
+these are meant to be owned and edited per-site, and none of them depend on
+the rest of the package.
+
+| File | What it does | When to use it |
+| --- | --- | --- |
+| `acf-local-json-autosync.php` | On local (Lando) only, enables ACF Extended's `force_sync` module so committed `acf-json` field groups auto-import into the DB (and deleted JSON files remove their DB group) whenever the dashboard, Field Groups list, or a field group edit screen is opened. Never runs on Pantheon. | Sites using ACF Extended Pro where stale local field groups keep reverting teammates' committed changes. |
+| `site-health-auth-guard.php` | Re-gates Pantheon's Site Health "compatibility" AJAX handler behind the `view_site_health_checks` capability. The bundled `pantheon-mu-plugin` (as of v1.5.7) registers it with no capability check, letting any authenticated user enumerate known-problematic active plugins. No-op off Pantheon, and no-op once upstream fixes it. | Pantheon sites, until [pantheon-mu-plugin](https://github.com/pantheon-systems/pantheon-mu-plugin) ships a fix — then delete it. |
+| `suppress-admin-notices.php` | Prevents specific third-party plugin admin notices (FileBird review/first-folder nags, Yoast Duplicate Post welcome notice) from rendering by short-circuiting the option each notice gates on via `pre_option_*` / `pre_site_option_*` filters. | Any site running those plugins; edit the arrays at the top of your copy to suppress additional notices. |
+
+These drop-ins are deliberately exempt from the package's module
+conventions: they fire no `threespot/*` filters and may use closures,
+because each site edits its own copy directly instead of overriding
+behavior through hooks.
+
 ## Using it in a theme
 
 Once installed, a theme's `functions.php` typically does three things:
@@ -684,7 +703,10 @@ threespot/wp-base-config/
 ├── UPGRADING.md                                 # breaking changes to filters / public names / unhookable callbacks
 ├── bootstrap.php                                # registers all MU-plugin modules
 ├── mu-plugins/
-│   └── threespot-wp-base-config.php             # WP loader; symlink into web/app/mu-plugins/
+│   ├── threespot-wp-base-config.php             # WP loader; symlink into web/app/mu-plugins/
+│   ├── acf-local-json-autosync.php              # optional drop-in; copy per-site — see "Standalone drop-in mu-plugins"
+│   ├── site-health-auth-guard.php               # optional drop-in; copy per-site (Pantheon only)
+│   └── suppress-admin-notices.php               # optional drop-in; copy per-site and edit its lists
 ├── dist/                                        # frontend tooling configs; symlinked from each theme
 │   ├── eslint.config.js
 │   ├── .stylelintrc.cjs

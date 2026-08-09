@@ -19,6 +19,16 @@ Never introduce Unicode smart quotes or curly quotes in any code file (PHP, JS, 
 - `mu-plugins/threespot-wp-base-config.php` is the WP loader stub copied/
   symlinked into the consuming site's `web/app/mu-plugins/`. It does
   nothing but `require` the package's `bootstrap.php`. Do not put logic in it.
+- Every other file in `mu-plugins/` is a **standalone drop-in** (currently
+  `acf-local-json-autosync.php`, `site-health-auth-guard.php`,
+  `suppress-admin-notices.php`): self-contained, never registered in
+  `bootstrap.php`, copied — not symlinked — into a site's
+  `web/app/mu-plugins/` only when that site needs it. The `src/MuPlugins`
+  conventions below (named static methods, `threespot/*` filters, docblock
+  filter lists, RegistrationTest assertions) do NOT apply to drop-ins,
+  because sites own and edit their copies directly. Each drop-in must be
+  self-documenting via its plugin header and listed in the README's
+  "Standalone drop-in mu-plugins" table.
 - `src/Sage/` holds Acorn/Vite-aware adapters. These are the ONLY files in
   the package that may `use Illuminate\Support\Facades\*`. Everything in
   `src/MuPlugins/` and `src/Helpers/` must run on plain WP without Acorn.
