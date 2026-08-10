@@ -112,6 +112,16 @@ change, a test Lando site is used as the verification surface.
   `UNRESOLVED_IMPORT` on every consuming build. The base receives
   plugin constructors as arguments (`threespotViteBase({eslint,
   stylelint, ...})`) and instantiates them itself. Keep that shape.
+- **`dist/package.json` is load-bearing, not a stray npm manifest.** Its
+  single key (`{"type": "module"}`) is what makes Node and Vite treat
+  `dist/vite-base.js` and `dist/eslint.config.js` as ESM. Both are loaded
+  through a symlink into `vendor/`, so the nearest `package.json` is resolved
+  from the real path — the consuming theme's own `"type": "module"` never
+  applies, and without this file the search reaches the Bedrock project root
+  and comes back CommonJS. Delete it and every consuming build warns
+  (`ESM syntax in a file loaded as CommonJS`), and the config fails outright
+  under Vite's `configLoader: 'native'`. Consequence for new files: everything
+  in `dist/` is ESM by default — use a `.cjs` extension if it needs `require`.
 - **`src/Assets/critical.js` is pseudo-minified by string replacement
   at runtime** in `CriticalConfig::loadMinifiedSource()`. The header
   comment on `CriticalConfig` lists the patterns that get tightened —

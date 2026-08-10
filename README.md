@@ -388,8 +388,41 @@ dist/
 ├── .stylelintrc.cjs       # Stylelint w/ stylelint-scss
 ├── postcss.config.cjs     # postcss-pxtorem + postcss-preset-env
 ├── .pxtorem-config.cjs    # px → rem conversion rules (loaded by postcss.config.cjs)
-└── vite-base.js           # Shared Vite config (consumed via mergeConfig — see below)
+├── vite-base.js           # Shared Vite config (consumed via mergeConfig — see below)
+└── package.json           # marks this directory ESM — see below; not an npm package
 ```
+
+### Why `dist/package.json` exists
+
+`vite-base.js` and `eslint.config.js` are ESM, and both Node and Vite decide a
+`.js` file's module format from the nearest `package.json` `"type"` field.
+Because those two files are loaded through a symlink into `vendor/`, the
+*consuming theme's* `package.json` is not the nearest one: the search runs from
+the resolved real path, walks past this package (which has no `package.json` of
+its own), lands on the Bedrock project root, finds no `"type"`, and treats both
+files as CommonJS. Node then reparses them as ESM anyway (a
+`MODULE_TYPELESS_PACKAGE_JSON` warning, with a per-load cost), and Vite 8.2+
+warns on every consuming build:
+
+```
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`,
+    which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (.../dist/vite-base.js:1:1)
+```
+
+That is not only noise — under `configLoader: 'native'` the config fails to load
+on any Node without ESM syntax detection. `dist/package.json` is a one-key file
+(`{"type": "module"}`) that declares the directory ESM and settles both.
+
+Note that `NODE_OPTIONS=--preserve-symlinks` does *not* avoid this. It changes
+Node's resolution, but Vite's config loader runs its own resolver, which follows
+the symlink to `vendor/` regardless — which is why the warning appears even in
+themes whose `vite` script sets that flag.
+
+Keep the file to its single key: it is not an npm package and must never gain
+dependencies. Any new file in `dist/` is ESM by default — give it a `.cjs`
+extension if it needs `require`, as the Stylelint, PostCSS and pxtorem configs
+already do.
 
 ### Symlink them from the theme
 
@@ -712,7 +745,8 @@ threespot/wp-base-config/
 │   ├── .stylelintrc.cjs
 │   ├── postcss.config.cjs
 │   ├── .pxtorem-config.cjs
-│   └── vite-base.js                             # consumed via mergeConfig — see "Vite: shared base + per-project wrapper"
+│   ├── vite-base.js                             # consumed via mergeConfig — see "Vite: shared base + per-project wrapper"
+│   └── package.json                             # {"type": "module"} — see "Why dist/package.json exists"
 └── src/
     ├── MuPlugins/                               # named-callback hook modules
     │   ├── AcfConfig.php
