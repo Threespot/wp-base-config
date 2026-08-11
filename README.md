@@ -652,7 +652,7 @@ defaults match the legacy theme's behavior.
 | `threespot/admin/taxonomies_hidden_from_nav_menus` | `threespot_hide_taxonomy_from_nav_menus` / `threespot_show_taxonomy_in_nav_menus` | `category` |
 | `threespot/admin/user_roles_removed` | `threespot_keep_user_role` / `threespot_remove_user_role` | `wpseo_manager`, `wpseo_editor` |
 | `threespot/assets/do_not_defer_scripts` | `threespot_defer_script` / `threespot_no_defer_script` | jQuery / WP / Gravity Forms / WooCommerce / WPForms-reCAPTCHA handles |
-| `threespot/blocks/disabled_block_bindings_sources` | `threespot_keep_block_bindings_source` / `threespot_remove_block_bindings_source` | `core/post-data`, `core/post-meta` |
+| `threespot/blocks/disabled_block_bindings_sources` | `threespot_keep_block_bindings_source` / `threespot_remove_block_bindings_source` | `core/post-meta` (`core/post-data` must stay registered — WP 6.9+ core blocks render through it) |
 | `threespot/helpers/excluded_post_types` | `threespot_include_post_type` / `threespot_exclude_post_type` | `ifso_triggers` |
 
 `keep_*` removes an item from the subtractive list (so the underlying thing

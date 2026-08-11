@@ -14,14 +14,16 @@ namespace Threespot\Wp\MuPlugins;
  *                                       Used by Threespot\Wp\Helpers\format_video_iframe().
  *   threespot/blocks/disabled_heading_levels — array<int> heading levels to disable (default: [1])
  *   threespot/blocks/disabled_block_bindings_sources — array<string> block-bindings source names
- *                                       to unregister (default: ['core/post-data', 'core/post-meta'])
+ *                                       to unregister (default: ['core/post-meta'])
  *   threespot/blocks/cover_default_overlay_class — string class copied onto the cover wrapper when
  *                                       the cover has no overlay color (default: 'has-dark-background-color')
  */
 class BlockConfig
 {
+    // Note: 'core/post-data' must stay registered. Since WP 6.9 core blocks
+    // (e.g. core/post-date) render through it and call get_value() on the
+    // source with no null check, so unregistering it fatals the front end.
     public const DEFAULT_DISABLED_BLOCK_BINDINGS_SOURCES = [
-        'core/post-data',
         'core/post-meta',
     ];
 
