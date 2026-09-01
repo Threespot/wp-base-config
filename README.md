@@ -384,7 +384,7 @@ Files:
 
 ```
 dist/
-├── eslint.config.js       # ESLint v9 flat config (browser + Gutenberg globals)
+├── eslint.config.js       # ESLint 9+ flat config (browser + Gutenberg globals)
 ├── .stylelintrc.cjs       # Stylelint w/ stylelint-scss
 ├── postcss.config.cjs     # postcss-pxtorem + postcss-preset-env
 ├── .pxtorem-config.cjs    # px → rem conversion rules (loaded by postcss.config.cjs)
@@ -442,8 +442,8 @@ populated.
 
 ### Heads-up: symlinked configs and `node_modules`
 
-ESLint v9 flat config uses ESM `import` for plugins (`@eslint/js`,
-`eslint-plugin-react`, etc.). By default Node resolves symlinks before
+ESLint flat config uses ESM `import` for its dependencies (`@eslint/js`,
+`globals`). By default Node resolves symlinks before
 walking up to find `node_modules` — which means a symlinked
 `eslint.config.js` would look for plugins under
 `vendor/threespot/wp-base-config/node_modules`, not the theme's.
@@ -572,6 +572,52 @@ export default [
   },
 ];
 ```
+
+### Linting React code
+
+The shared config parses JSX everywhere (`jsx: true`), and ESLint 9+ counts a
+component used only in JSX as a reference, so `no-unused-vars` needs no plugin
+to see it. That covers Gutenberg `wp.element` code and plain React alike. The
+config deliberately does **not** ship `eslint-plugin-react`: a React-heavy site
+and a plain block theme want different rule sets, and the plugin's `eslint`
+peer range excludes ESLint 10 for a real reason (see the version note in the
+example below), so shipping it produced a peer-dependency warning in every
+consuming theme.
+
+A site that wants React best-practice checks (`react/jsx-key`,
+`react/no-direct-mutation-state`, ...) adds the plugin itself with the wrapper
+pattern above:
+
+```bash
+yarn add -D eslint-plugin-react
+```
+
+```js
+// theme/eslint.config.js (real file, not a symlink)
+import threespotConfig from '../../../../vendor/threespot/wp-base-config/dist/eslint.config.js';
+import react from 'eslint-plugin-react';
+
+export default [
+  ...threespotConfig,
+  {
+    files: ['**/*.{js,jsx}'],
+    ...react.configs.flat.recommended,
+    // Pin the version; do not use 'detect'. As of eslint-plugin-react 7.37,
+    // detection calls context.getFilename(), which ESLint 10 removed, and
+    // every rule that checks the React version then throws.
+    settings: { react: { version: '18.3' } },
+    rules: {
+      ...react.configs.flat.recommended.rules,
+      // Gutenberg's wp.element pragma supplies createElement; React 17+ has
+      // the automatic runtime. Neither needs React in scope.
+      'react/react-in-jsx-scope': 'off',
+    },
+  },
+];
+```
+
+Verified on ESLint 10 with `eslint-plugin-react` 7.37.5: the recommended set
+runs and reports `react/jsx-key`, `react/prop-types` and `react/display-name`.
 
 ## What stays per-site
 

@@ -1,7 +1,5 @@
 import js from '@eslint/js';
 import globals from 'globals';
-import importPlugin from 'eslint-plugin-import';
-import reactPlugin from 'eslint-plugin-react';
 
 export default [
   js.configs.recommended,
@@ -13,10 +11,6 @@ export default [
   },
   {
     files: ['**/*.js', '**/*.jsx', '**/*.mjs', '**/*.cjs'],
-    plugins: {
-      import: importPlugin,
-      react: reactPlugin,
-    },
     languageOptions: {
       ecmaVersion: 2020,
       sourceType: 'module',
@@ -29,25 +23,15 @@ export default [
       },
       parserOptions: {
         ecmaFeatures: {
-          // Allow JSX syntax in .js files (used with Gutenberg wp.element)
+          // Allow JSX syntax in .js files (used with Gutenberg wp.element).
+          // ESLint 9+ counts JSX identifiers as references on its own, so
+          // no-unused-vars needs no eslint-plugin-react to see them.
           jsx: true,
         },
       },
     },
-    settings: {
-      react: { version: 'detect' },
-      'import/core-modules': [],
-      'import/ignore': [
-        'node_modules',
-        '\\.(coffee|scss|css|less|hbs|svg|json)$',
-      ],
-    },
     rules: {
       'no-console': 0,
-      // Count JSX identifiers as usages to avoid false no-unused-vars errors
-      'react/jsx-uses-vars': 'warn',
-      'react/jsx-uses-react': 'off',
-      'react/react-in-jsx-scope': 'off',
       'quotes': ['warn', 'single', { avoidEscape: true }],
       'comma-dangle': [
         'error',
