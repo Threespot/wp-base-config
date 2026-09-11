@@ -124,15 +124,20 @@ class BlockConfig
     /**
      * Strip empty paragraphs from post content and ACF wysiwyg output.
      *
-     * Catches Gutenberg's <p></p> / <p class=""></p> plus the TinyMCE-style
-     * empties wpautop produces from ACF wysiwyg fields: <p>&nbsp;</p>,
-     * whitespace-only, and <p><br></p>.
+     * Strips a <p> with no content regardless of its attributes (class, id, style),
+     * so an empty paragraph used only as an HTML anchor is removed too. Content that
+     * counts as empty: whitespace, &nbsp;, a literal U+00A0 (pasted from Word), and
+     * <br>. The /u flag makes \s match U+00A0 (bytes C2 A0), not just ASCII space.
+     * Not handled: &#160;, &#xA0;, zero-width spaces, uppercase <P>.
      *
      * CSS could hide them, but they still affect first/last/nth-child selectors.
      */
     public static function stripEmptyParagraphs(string $content): string
     {
-        return preg_replace('/<p(?: class="")?>(?:\s|&nbsp;|<br ?\/?>)*<\/p>/', '', $content);
+        $result = preg_replace('/<p(?:\s[^>]*)?>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>/u', '', $content);
+
+        // preg_replace returns null on malformed UTF-8; keep the content untouched.
+        return $result ?? $content;
     }
 
     /**
