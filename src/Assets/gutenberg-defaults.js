@@ -63,11 +63,6 @@ wp.domReady(() => {
     label: 'Logo Grid',
   });
 
-  wp.blocks.registerBlockStyle('core/group', {
-    name: 'no-vert-margin',
-    label: 'No Margin',
-  });
-
   wp.blocks.registerBlockStyle('core/heading', {
     name: 'h2',
     label: 'H2',

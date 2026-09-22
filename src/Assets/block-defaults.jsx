@@ -12,6 +12,7 @@
 //  - "Text wrapping" selector to pullquote blocks
 //  - "Hide Bullets" toggle to list blocks
 //  - "Sticky" toggle to column blocks
+//  - "No vertical margin" toggle to group blocks (Layout panel on WP 7.1+)
 //
 // https://developer.wordpress.org/block-editor/reference-guides/filters/block-filters/
 //------------------------------------------------------------------------
@@ -23,6 +24,7 @@ const {
   PanelBody,
   ToggleControl,
   SelectControl,
+  __experimentalToolsPanelItem: ToolsPanelItem,
   __experimentalToggleGroupControl: ToggleGroupControl,
   __experimentalToggleGroupControlOption: ToggleGroupControlOption,
 } = wp.components;
@@ -31,6 +33,7 @@ const ACCORDION_BLOCK = 'core/accordion';
 const COLUMN_BLOCK = 'core/column';
 const DETAILS_BLOCK = 'core/details';
 const GALLERY_BLOCK = 'core/gallery';
+const GROUP_BLOCK = 'core/group';
 const HEADING_BLOCK = 'core/heading';
 const LIST_BLOCK = 'core/list';
 const PULLQUOTE_BLOCK = 'core/pullquote';
@@ -105,6 +108,73 @@ function MarginControl({ label, value, onChange }) {
 // Returns a `${prefix}-${value}` class fragment, or '' for the default.
 function marginClass(prefix, value) {
   return value && value !== 'default' ? ` ${prefix}-${value}` : '';
+}
+
+// "No vertical margin" toggle for group blocks. The state lives in the
+// block's className (not a custom attribute) so content saved with the old
+// "No Margin" block style keeps working and existing theme CSS still applies.
+const NO_VERT_MARGIN_CLASS = 'is-style-no-vert-margin';
+
+// WP 7.1 (Gutenberg 23.3) moved the Layout panel into the Styles tab and
+// added the "layout" InspectorControls group. Older versions warn and render
+// nothing for an unknown group, so we fall back to our own panel there.
+// There is no public version flag, so detect it by an export that shipped in
+// the same release.
+// https://github.com/WordPress/gutenberg/pull/77922
+const HAS_LAYOUT_CONTROLS_GROUP =
+  'getDimensionsClassesAndStyles' in wp.blockEditor ||
+  '__experimentalGetDimensionsClassesAndStyles' in wp.blockEditor;
+
+function hasClass(className, name) {
+  return (className || '').split(/\s+/).includes(name);
+}
+
+// Returns className with `name` added or removed, or undefined when empty
+// so the block does not save an empty class attribute.
+function toggleClass(className, name, enabled) {
+  const classes = (className || '').split(/\s+/).filter((c) => c && c !== name);
+  if (enabled) {
+    classes.push(name);
+  }
+  return classes.length ? classes.join(' ') : undefined;
+}
+
+function GroupMarginControls({ attributes, setAttributes, clientId }) {
+  const isEnabled = hasClass(attributes.className, NO_VERT_MARGIN_CLASS);
+  const setEnabled = (enabled) =>
+    setAttributes({ className: toggleClass(attributes.className, NO_VERT_MARGIN_CLASS, enabled) });
+  const toggle = (
+    <ToggleControl
+      label="No vertical margin"
+      help="Remove the top and bottom margin from this group."
+      checked={isEnabled}
+      onChange={setEnabled}
+    />
+  );
+
+  if (HAS_LAYOUT_CONTROLS_GROUP) {
+    return (
+      <InspectorControls group="layout">
+        <ToolsPanelItem
+          label="No vertical margin"
+          hasValue={() => isEnabled}
+          onDeselect={() => setEnabled(false)}
+          isShownByDefault
+          panelId={clientId}
+        >
+          {toggle}
+        </ToolsPanelItem>
+      </InspectorControls>
+    );
+  }
+
+  return (
+    <InspectorControls>
+      <PanelBody title="Group Options" initialOpen={true}>
+        {toggle}
+      </PanelBody>
+    </InspectorControls>
+  );
 }
 
 // 1. Add new attributes to specific blocks
@@ -280,6 +350,15 @@ const withCustomBlockControls = createHigherOrderComponent((BlockEdit) => {
               />
             </PanelBody>
           </InspectorControls>
+          <BlockEdit {...props} />
+        </Fragment>
+      );
+    }
+
+    if (props.name === GROUP_BLOCK) {
+      return (
+        <Fragment>
+          <GroupMarginControls {...props} />
           <BlockEdit {...props} />
         </Fragment>
       );
