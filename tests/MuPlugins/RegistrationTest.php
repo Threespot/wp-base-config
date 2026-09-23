@@ -6,6 +6,7 @@ use Brain\Monkey\Functions;
 use Threespot\Wp\Tests\BrainMonkeyTestCase;
 
 use Threespot\Wp\MuPlugins\AcfConfig;
+use Threespot\Wp\MuPlugins\AcornConfig;
 use Threespot\Wp\MuPlugins\AdminConfig;
 use Threespot\Wp\MuPlugins\AssetConfig;
 use Threespot\Wp\MuPlugins\BlockConfig;
@@ -127,6 +128,39 @@ class RegistrationTest extends BrainMonkeyTestCase
         try {
             SmtpConfig::register();
             $this->assertActionRegistered('phpmailer_init', [SmtpConfig::class, 'configurePhpMailer']);
+        } finally {
+            unset($_ENV['PANTHEON_ENVIRONMENT']);
+        }
+    }
+
+    public function test_acorn_config_skips_outside_pantheon(): void
+    {
+        unset($_ENV['PANTHEON_ENVIRONMENT']);
+
+        AcornConfig::register();
+
+        $this->assertArrayNotHasKey('setup_theme', $this->actions);
+    }
+
+    public function test_acorn_config_skips_lando(): void
+    {
+        $_ENV['PANTHEON_ENVIRONMENT'] = 'lando';
+
+        try {
+            AcornConfig::register();
+            $this->assertArrayNotHasKey('setup_theme', $this->actions);
+        } finally {
+            unset($_ENV['PANTHEON_ENVIRONMENT']);
+        }
+    }
+
+    public function test_acorn_config_registers_on_pantheon(): void
+    {
+        $_ENV['PANTHEON_ENVIRONMENT'] = 'dev';
+
+        try {
+            AcornConfig::register();
+            $this->assertActionRegistered('setup_theme', [AcornConfig::class, 'setStoragePath']);
         } finally {
             unset($_ENV['PANTHEON_ENVIRONMENT']);
         }

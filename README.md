@@ -21,11 +21,12 @@ Two kinds of code:
 
 **MU-plugin modules** (`src/MuPlugins/*Config.php`) register WordPress hooks
 and ship as a single mu-plugin. They survive theme swaps, exactly like the
-legacy `app/*-config.php` files did. The nine modules cover:
+legacy `app/*-config.php` files did. The ten modules cover:
 
 | Module | Responsibility |
 |---|---|
 | `AcfConfig`      | ACF options page, custom WYSIWYG toolbars, "Hide Label" field setting |
+| `AcornConfig`    | On Pantheon, moves Acorn's cache, compiled views and log to the private files directory. See [Acorn storage on Pantheon](#acorn-storage-on-pantheon) |
 | `AdminConfig`    | Dashboard widgets, admin bar, customizer sections, robots.txt, SVG uploads, ~20 other behaviors |
 | `AssetConfig`    | Script `defer` policy, optional local jQuery, oEmbed cleanup |
 | `BlockConfig`    | Block editor polish: custom category, h1 → h2, lazy iframes, editor CSS/JS |
@@ -109,6 +110,44 @@ These drop-ins are deliberately exempt from the package's module
 conventions: they fire no `threespot/*` filters and may use closures,
 because each site edits its own copy directly instead of overriding
 behavior through hooks.
+
+## Acorn storage on Pantheon
+
+Acorn (the framework under Sage) keeps its cache, compiled Blade views and log
+in `wp-content/cache/acorn` by default. On Pantheon that folder is read-only,
+and Sage fails with:
+
+```
+The /code/web/wp-content/cache/acorn/framework/cache directory must be present and writable.
+```
+
+On every Pantheon environment (not Lando), `AcornConfig` sets
+`ACORN_STORAGE_PATH` to `wp-content/uploads/private/acorn` and creates the
+folders on the first request. `uploads` is Pantheon's writable files
+directory, and Pantheon refuses web requests to its `private` folder
+([Pantheon private paths](https://docs.pantheon.io/guides/secure-development/private-paths)).
+A new site needs no symlink and no folders created over SFTP. Locally, Acorn
+keeps its default path.
+
+To use a different path, define `ACORN_STORAGE_PATH` in
+`config/application.php`. The module leaves it alone.
+
+### Existing sites
+
+Older sites commit a `web/wp-content/cache` symlink to `uploads/cache`, with a
+`cache` folder created over SFTP on each environment. That put Acorn's log at a
+public URL: `/wp-content/uploads/cache/acorn/logs/laravel.log`. After updating
+the package and deploying:
+
+1. Check each environment uses the new path:
+   `terminus wp <site>.<env> -- eval 'echo ACORN_STORAGE_PATH;'`
+   should print a path ending in `uploads/private/acorn`.
+2. Delete the old `files/cache/acorn` folder on each environment over SFTP.
+   It holds the public copy of the log.
+3. Keep the symlink if another plugin writes to `wp-content/cache`. If not, you
+   can delete it, along with the `!web/wp-content/uploads/cache/acorn/...`
+   line in `.gitignore` and the `mkdir -p web/wp-content/uploads/cache/acorn/...`
+   line in `.lando.yml`.
 
 ## Using it in a theme
 
@@ -796,6 +835,7 @@ threespot/wp-base-config/
 └── src/
     ├── MuPlugins/                               # named-callback hook modules
     │   ├── AcfConfig.php
+    │   ├── AcornConfig.php
     │   ├── AdminConfig.php
     │   ├── AssetConfig.php
     │   ├── BlockConfig.php

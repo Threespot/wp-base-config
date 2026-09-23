@@ -129,7 +129,7 @@ change, a test Lando site is used as the verification surface.
   mangled**. If a critical script needs a human-readable string, pass
   it in via a filter rather than baking it into `critical.js`.
 - **Pantheon env check** (`$_ENV['PANTHEON_ENVIRONMENT']`) is hardcoded
-  in `AdminConfig` and `SmtpConfig`. v0.1 assumes every consumer is on
+  in `AcornConfig`, `AdminConfig` and `SmtpConfig`. v0.1 assumes every consumer is on
   Pantheon. Don't generalize this until a non-Pantheon site enters
   the fleet — the planning doc explicitly defers that.
 

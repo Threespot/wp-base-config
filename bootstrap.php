@@ -8,6 +8,7 @@
  */
 
 use Threespot\Wp\MuPlugins\AcfConfig;
+use Threespot\Wp\MuPlugins\AcornConfig;
 use Threespot\Wp\MuPlugins\AdminConfig;
 use Threespot\Wp\MuPlugins\AssetConfig;
 use Threespot\Wp\MuPlugins\BlockConfig;
@@ -17,6 +18,7 @@ use Threespot\Wp\MuPlugins\LoginConfig;
 use Threespot\Wp\MuPlugins\SmtpConfig;
 use Threespot\Wp\MuPlugins\ThemeConfig;
 
+AcornConfig::register();
 LoginConfig::register();
 SmtpConfig::register();
 AcfConfig::register();
