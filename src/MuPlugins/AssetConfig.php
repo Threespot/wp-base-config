@@ -101,9 +101,12 @@ class AssetConfig
             return;
         }
 
-        // get_theme_file_uri() resolves against the content dir (no /wp prefix in
-        // Bedrock) and respects child themes.
-        $jquery_url = get_theme_file_uri('public/build/assets/resources/' . ltrim($jquery_path, '/'));
+        // Not get_theme_file_uri(): the prettify config makes its `theme_file_uri`
+        // hook return a root-relative URL, and WP_Scripts prefixes any src that
+        // isn't absolute (or under WP_CONTENT_URL) with site_url() -- `/wp` in
+        // Bedrock -- so the script was requested from /wp/wp-content/... and
+        // 404'd. Lando's nginx rewrites that path back, which hides the bug locally.
+        $jquery_url = get_stylesheet_directory_uri() . '/public/build/assets/resources/' . ltrim($jquery_path, '/');
 
         $version = apply_filters('threespot/assets/jquery_version', null);
 
