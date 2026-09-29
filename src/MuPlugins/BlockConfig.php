@@ -241,15 +241,13 @@ class BlockConfig
             }
         }
 
-        // Embeds: lazy load, allow encrypted-media
-        if ($block['blockName'] === 'core/embed') {
-            // lazy-load iframes — https://web.dev/articles/iframe-lazy-loading
+        // Embeds: lazy load, unless the provider already sets `loading` (e.g. Spotify),
+        // so the attribute isn't duplicated. An embed block holds one iframe, so
+        // checking the whole block is enough. Don't add `allow`: providers send their
+        // own, and browsers would keep a duplicate placed before it instead.
+        // https://web.dev/articles/iframe-lazy-loading
+        if ($block['blockName'] === 'core/embed' && !str_contains($block_content, 'loading=')) {
             $block_content = str_replace('<iframe ', '<iframe loading="lazy" ', $block_content);
-
-            // Allow the Encrypted Media Extensions API so media providers (e.g. SoundCloud)
-            // don’t trigger a Permissions-Policy console violation, like this:
-            // [Violation] Permissions policy violation: encrypted-media is not allowed in this document.
-            $block_content = str_replace('<iframe ', '<iframe allow="encrypted-media" ', $block_content);
         }
 
         return $block_content;
