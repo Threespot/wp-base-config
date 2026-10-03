@@ -36,13 +36,120 @@ class GeneralWpStubsTest extends BrainMonkeyTestCase
         $this->assertTrue(is_external('https://google.com'));
     }
 
-    public function test_is_external_treats_pantheon_dev_urls_as_internal(): void
+    public function test_is_external_still_detects_external_links_on_pantheon(): void
     {
         Functions\when('home_url')->justReturn('https://dev-mysite.pantheonsite.io');
 
-        // On Pantheon dev/test, all URLs are treated as internal to avoid
-        // false-positives during pre-launch QA.
-        $this->assertFalse(is_external('https://google.com'));
+        $this->assertTrue(is_external('https://google.com'));
+        $this->assertFalse(is_external('https://dev-mysite.pantheonsite.io/about'));
+    }
+
+    public function test_is_external_treats_this_sites_pantheon_environments_as_internal(): void
+    {
+        Functions\when('home_url')->justReturn('https://mysite.lndo.site');
+        $this->withEnv('PANTHEON_SITE_NAME', 'mysite', function () {
+            $this->assertFalse(is_external('https://dev-mysite.pantheonsite.io/about'));
+            $this->assertFalse(is_external('https://test-mysite.pantheonsite.io/'));
+            $this->assertFalse(is_external('https://pr-12-mysite.pantheonsite.io/'));
+        });
+    }
+
+    public function test_is_external_treats_other_pantheon_sites_as_external(): void
+    {
+        Functions\when('home_url')->justReturn('https://mysite.lndo.site');
+        $this->withEnv('PANTHEON_SITE_NAME', 'mysite', function () {
+            $this->assertTrue(is_external('https://dev-othersite.pantheonsite.io/'));
+            $this->assertTrue(is_external('https://dev-notmysite.pantheonsite.io/'));
+        });
+    }
+
+    public function test_is_external_treats_any_pantheon_url_as_internal_without_a_site_name(): void
+    {
+        Functions\when('home_url')->justReturn('https://mysite.test');
+        $this->withEnv('PANTHEON_SITE_NAME', null, function () {
+            $this->assertFalse(is_external('https://dev-mysite.pantheonsite.io/'));
+        });
+    }
+
+    public function test_is_external_treats_subdomains_as_internal(): void
+    {
+        Functions\when('home_url')->justReturn('https://example.com');
+
+        $this->assertFalse(is_external('https://members.example.com/account'));
+    }
+
+    public function test_is_external_requires_a_dot_before_the_domain(): void
+    {
+        Functions\when('home_url')->justReturn('https://example.com');
+
+        $this->assertTrue(is_external('https://evilexample.com/'));
+        $this->assertTrue(is_external('https://example.com.evil.net/'));
+    }
+
+    public function test_is_external_ignores_www_on_either_side(): void
+    {
+        Functions\when('home_url')->justReturn('https://www.example.com');
+
+        $this->assertFalse(is_external('https://example.com/about'));
+        $this->assertFalse(is_external('https://members.example.com/'));
+
+        Functions\when('home_url')->justReturn('https://example.com');
+
+        $this->assertFalse(is_external('https://www.example.com/about'));
+    }
+
+    public function test_is_external_ignores_case_and_ports(): void
+    {
+        Functions\when('home_url')->justReturn('https://Example.com');
+
+        $this->assertFalse(is_external('HTTPS://EXAMPLE.COM:8443/about'));
+    }
+
+    public function test_is_external_handles_protocol_relative_urls(): void
+    {
+        Functions\when('home_url')->justReturn('https://example.com');
+
+        $this->assertFalse(is_external('//example.com/about'));
+        $this->assertTrue(is_external('//google.com/'));
+    }
+
+    public function test_is_external_treats_links_without_a_host_as_internal(): void
+    {
+        Functions\when('home_url')->justReturn('https://example.com');
+
+        $this->assertFalse(is_external('#main'));
+        $this->assertFalse(is_external('mailto:info@example.com'));
+        $this->assertFalse(is_external(''));
+        $this->assertFalse(is_external(null));
+    }
+
+    /**
+     * Set an environment variable for one block of assertions, then restore it.
+     *
+     * @param string $name
+     * @param string|null $value null removes the variable
+     * @param callable $assertions
+     */
+    private function withEnv(string $name, ?string $value, callable $assertions): void
+    {
+        $had = array_key_exists($name, $_ENV);
+        $old = $_ENV[$name] ?? null;
+
+        if ($value === null) {
+            unset($_ENV[$name]);
+        } else {
+            $_ENV[$name] = $value;
+        }
+
+        try {
+            $assertions();
+        } finally {
+            if ($had) {
+                $_ENV[$name] = $old;
+            } else {
+                unset($_ENV[$name]);
+            }
+        }
     }
 
     /* -----------------------------------------------------------------

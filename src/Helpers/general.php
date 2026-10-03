@@ -44,31 +44,47 @@ function strip_p_tags($markup) {
 /**
  * Check if URL is external.
  *
- * @link https://stackoverflow.com/a/22964930/673457
+ * A link is internal when it has no host (relative paths, #anchors, mailto:),
+ * when its host is the site's host or a subdomain of it, or when it points to
+ * one of this site's own Pantheon environments. "www." is ignored on both
+ * sides, so example.com and www.example.com are the same site.
+ *
+ * Note: Only home_url() counts as this site. A hard-coded link to the
+ * production domain is external on local, dev and test.
+ *
  * @param string $url
  * @return bool
  */
 function is_external($url) {
-    $home_url = parse_url(home_url());
-    $test_url = parse_url($url);
+    // Make two hosts comparable: lowercase, drop the trailing dot of a fully
+    // qualified name ("example.com." is "example.com"), then drop a leading "www."
+    // so "WWW.Example.com" and "example.com" match. A missing host (null) becomes "".
+    $normalize_host = function ($host) {
+        return preg_replace('/^www\./', '', rtrim(strtolower((string) $host), '.'));
+    };
 
-    // Ignore Pantheon URLs for local dev
-    if (str_contains($home_url['host'], 'pantheonsite.io')) {
+    $site_host = $normalize_host(parse_url(home_url(), PHP_URL_HOST));
+    $link_host = $normalize_host(parse_url((string) $url, PHP_URL_HOST));
+
+    // Ignore links without a host (relative URLs, #anchors, mailto: and tel:)
+    if ($link_host === '') {
         return false;
     }
 
-    // Ignore relative URLs
-    if (empty($test_url['host'])) {
-        return false;
+    // Ignore links to this site's Pantheon environments (e.g. dev-mysite.pantheonsite.io),
+    // so content copied from dev or test doesn't show external icons locally.
+    // Pantheon hosts are "<env>-<site>.pantheonsite.io". Without a site name
+    // (e.g. outside Lando and Pantheon), any Pantheon URL counts as internal.
+    if (str_ends_with($link_host, '.pantheonsite.io')) {
+        $site_name = strtolower((string) ($_ENV['PANTHEON_SITE_NAME'] ?? ''));
+
+        if ($site_name === '' || str_ends_with($link_host, '-' . $site_name . '.pantheonsite.io')) {
+            return false;
+        }
     }
 
-    // Check if hosts are equal
-    if (strcasecmp($test_url['host'], $home_url['host']) === 0) {
-        return false;
-    }
-
-    // Check if the url host is a subdomain
-    return strrpos(strtolower($test_url['host']), $home_url['host']) !== strlen($test_url['host']) - strlen($home_url['host']);
+    // Same host, or a subdomain of it (the dot stops evilexample.com matching example.com)
+    return $link_host !== $site_host && !str_ends_with($link_host, '.' . $site_host);
 }
 
 /**
