@@ -8,9 +8,73 @@ use Threespot\Wp\Tests\BrainMonkeyTestCase;
 use function Threespot\Wp\Helpers\format_video_iframe;
 use function Threespot\Wp\Helpers\get_custom_post_types;
 use function Threespot\Wp\Helpers\is_external;
+use function Threespot\Wp\Helpers\is_live_env;
+use function Threespot\Wp\Helpers\is_pantheon;
+use function Threespot\Wp\Helpers\is_production;
 
 class GeneralWpStubsTest extends BrainMonkeyTestCase
 {
+    /* -----------------------------------------------------------------
+     * is_pantheon, is_live_env, is_production
+     * ----------------------------------------------------------------- */
+
+    public function test_environment_checks_on_each_environment(): void
+    {
+        // [PANTHEON_ENVIRONMENT, is_pantheon(), is_live_env()]
+        $cases = [
+            [null, false, false],
+            ['lando', false, false],
+            ['dev', true, false],
+            ['pr-12', true, false],
+            ['test', true, false],
+            ['live', true, true],
+        ];
+
+        foreach ($cases as [$env, $pantheon, $live]) {
+            $this->withEnv('PANTHEON_ENVIRONMENT', $env, function () use ($env, $pantheon, $live) {
+                $label = $env ?? '(unset)';
+                $this->assertSame($pantheon, is_pantheon(), "is_pantheon() on $label");
+                $this->assertSame($pantheon, is_production(), "is_production() on $label");
+                $this->assertSame($live, is_live_env(), "is_live_env() on $label");
+            });
+        }
+    }
+
+    public function test_environment_checks_apply_their_filters(): void
+    {
+        $this->withEnv('PANTHEON_ENVIRONMENT', 'live', function () {
+            \Brain\Monkey\Filters\expectApplied('threespot/helpers/is_live_env')->once()->with(true)->andReturn(false);
+            $this->assertFalse(is_live_env());
+
+            // is_production() keeps its old filter, on top of is_pantheon()'s
+            \Brain\Monkey\Filters\expectApplied('threespot/helpers/is_pantheon')->once()->with(true)->andReturn(true);
+            \Brain\Monkey\Filters\expectApplied('threespot/helpers/is_production')->once()->with(true)->andReturn(false);
+            $this->assertFalse(is_production());
+        });
+    }
+
+    public function test_is_pantheon_filter_reaches_is_production_but_not_the_reverse(): void
+    {
+        $this->withEnv('PANTHEON_ENVIRONMENT', 'test', function () {
+            // A hook on is_pantheon changes is_production() too
+            \Brain\Monkey\Filters\expectApplied('threespot/helpers/is_pantheon')->twice()->with(true)->andReturn(false);
+            \Brain\Monkey\Filters\expectApplied('threespot/helpers/is_production')->once()->with(false)->andReturn(false);
+            $this->assertFalse(is_production());
+
+            // is_pantheon() never applies the is_production filter (the once() above)
+            $this->assertFalse(is_pantheon());
+        });
+    }
+
+    public function test_is_production_filter_can_turn_it_on_off_pantheon(): void
+    {
+        // e.g. a site that switches GTM on locally to test it
+        $this->withEnv('PANTHEON_ENVIRONMENT', 'lando', function () {
+            \Brain\Monkey\Filters\expectApplied('threespot/helpers/is_production')->once()->with(false)->andReturn(true);
+            $this->assertTrue(is_production());
+        });
+    }
+
     /* -----------------------------------------------------------------
      * is_external
      * ----------------------------------------------------------------- */

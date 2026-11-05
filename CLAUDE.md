@@ -131,7 +131,10 @@ change, a test Lando site is used as the verification surface.
 - **Pantheon env check** (`$_ENV['PANTHEON_ENVIRONMENT']`) is hardcoded
   in `AcornConfig`, `AdminConfig` and `SmtpConfig`. v0.1 assumes every consumer is on
   Pantheon. Don't generalize this until a non-Pantheon site enters
-  the fleet — the planning doc explicitly defers that.
+  the fleet — the planning doc explicitly defers that. New code that
+  needs the environment uses the `is_pantheon()` / `is_live_env()`
+  helpers (`src/Helpers/general.php`), so sites can override it with
+  their filters.
 
 ## When adding a new mu-plugin module
 

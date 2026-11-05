@@ -1,11 +1,56 @@
 # Upgrading
 
-Breaking changes to the package's public contract — filter names, public
+Breaking changes and deprecations in the package's public contract — filter names, public
 `threespot_*` function names, and the named static callbacks sites unhook with
 `remove_action()`. Version numbers refer to git tags.
 
 Each entry is written to be actionable without further context, so a coding
 agent can be pointed at this file and asked to bring a site up to date.
+
+---
+
+## 0.2.12 → 0.2.13
+
+Not breaking: nothing changes until a site edits its own code.
+
+### `is_production()` is deprecated
+
+**What changed.** `is_production()` is true on every Pantheon environment, dev
+and test included, so code gated with it (usually GTM in the `App` composer)
+runs outside live. Two helpers replace it:
+
+- `is_pantheon()`: the same check under a clearer name.
+- `is_live_env()`: true only when `PANTHEON_ENVIRONMENT` is `live`.
+
+`is_production()` still works: it wraps `is_pantheon()` and also applies its
+own `threespot/helpers/is_production` filter.
+
+**Action.** Gate live-only code (analytics, cookie banners) with
+`is_live_env()`:
+
+```php
+use function Threespot\Wp\Helpers\is_live_env;
+
+'is_live' => is_live_env(),
+```
+
+Replace other calls with `is_pantheon()`.
+
+**If the site hooks `threespot/helpers/is_production`,** check what the hook
+does before switching, since `is_pantheon()` and `is_live_env()` don't apply
+it:
+
+- A hook that returns false on `test` (the "staging exclusion" the old
+  docblock suggested) was keeping live-only code off test. Delete it and use
+  `is_live_env()` for that code. Don't move it to
+  `threespot/helpers/is_pantheon`: `is_pantheon()` would then be false on
+  Pantheon's test environment.
+- Move any other hook to `threespot/helpers/is_pantheon`.
+
+The two filters are linked one way: `is_production()` starts from the
+filtered `is_pantheon()` result, so a hook on `threespot/helpers/is_pantheon`
+also changes `is_production()`, but a hook on
+`threespot/helpers/is_production` doesn't change `is_pantheon()`.
 
 ---
 
