@@ -709,6 +709,9 @@ point of enqueue and the site supplies the URL.
 | `threespot/blocks/pattern_category`       | `['slug'=>'threespotblock', 'label'=>'Custom Patterns']` | Custom pattern category |
 | `threespot/blocks/vimeo_color`            | `'ff5100'`                  | Read by `format_video_iframe()` helper |
 | `threespot/helpers/excluded_post_types`   | `['ifso_triggers']`         | Post types stripped from `get_custom_post_types()` |
+| `threespot/helpers/is_live_env`           | `PANTHEON_ENVIRONMENT === 'live'` | Return value of `is_live_env()` |
+| `threespot/helpers/is_pantheon`           | `PANTHEON_ENVIRONMENT` set and not `'lando'` | Return value of `is_pantheon()` |
+| `threespot/helpers/is_production`         | `is_pantheon()`             | Deprecated. Applies only to `is_production()`, on top of the `is_pantheon` filter (so a hook on `is_pantheon` changes `is_production()` too). See UPGRADING.md before moving a hook |
 | `threespot/login/header_text`             | `get_option('blogname')`    | Login logo alt text |
 | `threespot/login/header_url`              | `home_url()`                | Login logo link |
 | `threespot/smtp/config`                   | Mailhog defaults            | `host`, `port`, `auth`, `username`, `password` |
@@ -756,10 +759,16 @@ All live in the `Threespot\Wp\Helpers` namespace, autoloaded via Composer.
 
 | File | Functions |
 |---|---|
-| `general.php` | `bytes_to_human_size`, `strip_p_tags`, `is_external`, `nowrap`, `trim_excerpt`, `clean_wysiwyg_markup`, `strip_quotes`, `obfuscate`, `get_custom_post_types`, `format_video_iframe` |
+| `general.php` | `is_pantheon`, `is_live_env`, `bytes_to_human_size`, `strip_p_tags`, `is_external`, `nowrap`, `trim_excerpt`, `clean_wysiwyg_markup`, `strip_quotes`, `obfuscate`, `get_custom_post_types`, `format_video_iframe` (plus the deprecated `is_production`, which wraps `is_pantheon` and also applies its own filter) |
 | `image.php`   | `calculate_height`, `get_registered_image_sizes`, `blank_gif`, `get_image_file_type`, `bis_get_sizes`, `bis_srcset`, `buildAttributes`, `img_tag`, `get_img_alt`, `get_img_focal_point`, `resolve_bis_crop_param`, `set_img_alt` (plus `fly_*` deprecated aliases) |
 | `svg.php`     | `svg`, `append_icon` |
 | `taxonomy.php` | `get_primary_term` |
+
+Gate anything meant for the live site only (analytics, cookie banners) with
+`is_live_env()`. `is_pantheon()` is true on every Pantheon environment, dev and
+test included. It's the old `is_production()` under a clearer name, but the
+`threespot/helpers/is_production` filter doesn't apply to it: if the site hooks
+that filter, see [UPGRADING.md](UPGRADING.md) before switching.
 
 `image.php` reads a site-defined `IMAGE_SIZES` constant — kept per-site
 because image dimensions vary too much project to project. The image-resizing
@@ -818,7 +827,7 @@ entries narrow so real secrets are never masked.
 ```
 threespot/wp-base-config/
 ├── composer.json                                # type: library
-├── UPGRADING.md                                 # breaking changes to filters / public names / unhookable callbacks
+├── UPGRADING.md                                 # breaking changes and deprecations: filters / public names / unhookable callbacks
 ├── bootstrap.php                                # registers all MU-plugin modules
 ├── mu-plugins/
 │   ├── threespot-wp-base-config.php             # WP loader; symlink into web/app/mu-plugins/

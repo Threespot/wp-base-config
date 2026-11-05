@@ -10,9 +10,9 @@
  *   changes. Never runs on Pantheon.
  */
 
-// Local only. Lando sets PANTHEON_ENVIRONMENT to 'lando'; every real Pantheon
-// environment (dev/multidev/test/live) uses its own name. Mirrors the
-// Threespot\Wp\Helpers\is_production() convention in wp-base-config. (getenv()
+// Lando only. Lando sets PANTHEON_ENVIRONMENT to 'lando'; every real Pantheon
+// environment (dev/multidev/test/live) uses its own name. Not the same as
+// !is_pantheon(): this also bails when PANTHEON_ENVIRONMENT is unset. (getenv()
 // rather than $_ENV: same OS-injected value, without the unsanitized-superglobal
 // phpcs flag.)
 if (getenv('PANTHEON_ENVIRONMENT') !== 'lando') {

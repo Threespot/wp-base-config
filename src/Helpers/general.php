@@ -3,19 +3,49 @@
 namespace Threespot\Wp\Helpers;
 
 /**
- * Detect whether the current request is running on a production environment.
+ * Detect whether the current request is running on Pantheon: dev, test, live
+ * or a multidev, but not Lando (which sets PANTHEON_ENVIRONMENT to "lando").
  *
- * Treats any Pantheon environment other than the Lando-local override as
- * production. Sites can override by hooking the threespot/helpers/is_production
- * filter (e.g. to add a staging exclusion).
+ * Use is_live_env() for anything meant for the live site only, such as
+ * analytics. Sites can override this with the threespot/helpers/is_pantheon
+ * filter.
  *
  * @return bool
  */
-function is_production() {
-    $is_production = isset($_ENV['PANTHEON_ENVIRONMENT'])
+function is_pantheon() {
+    $is_pantheon = isset($_ENV['PANTHEON_ENVIRONMENT'])
         && $_ENV['PANTHEON_ENVIRONMENT'] !== 'lando';
 
-    return (bool) apply_filters('threespot/helpers/is_production', $is_production);
+    return (bool) apply_filters('threespot/helpers/is_pantheon', $is_pantheon);
+}
+
+/**
+ * Detect whether the current request is running on Pantheon's live
+ * environment. Dev, test, multidevs and Lando are all false.
+ *
+ * Sites can override this with the threespot/helpers/is_live_env filter
+ * (e.g. for a site hosted somewhere else).
+ *
+ * @return bool
+ */
+function is_live_env() {
+    $is_live = ($_ENV['PANTHEON_ENVIRONMENT'] ?? '') === 'live';
+
+    return (bool) apply_filters('threespot/helpers/is_live_env', $is_live);
+}
+
+/**
+ * Backwards-compat alias for is_pantheon(). Despite the name, it's true on
+ * every Pantheon environment, dev and test included. The
+ * threespot/helpers/is_production filter still applies to it, on top of the
+ * threespot/helpers/is_pantheon filter, but not to is_pantheon(). See
+ * UPGRADING.md before moving a hook.
+ *
+ * @deprecated Use is_pantheon(), or is_live_env() for the live site only.
+ * @return bool
+ */
+function is_production() {
+    return (bool) apply_filters('threespot/helpers/is_production', is_pantheon());
 }
 
 /**
