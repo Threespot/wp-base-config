@@ -9,6 +9,26 @@ agent can be pointed at this file and asked to bring a site up to date.
 
 ---
 
+## 0.2.13 → 0.2.14
+
+Not breaking: no action needed.
+
+### "No vertical margin" toggle shows on WordPress 7.0
+
+**What changed.** The group block's "No vertical margin" toggle goes in the
+Layout panel on WordPress 7.1+ and in a "Group Options" panel on older
+versions. The package chose by checking for a block-editor export it took to
+be new in 7.1, but that export is already in 7.0, so on 7.0 sites the toggle
+was placed in a sidebar group 7.0 doesn't have and didn't show at all. It now
+checks the WordPress version itself (the `version-X-Y-Z` class WordPress puts
+on the admin `<body>`), and falls back to the "Group Options" panel when it
+can't tell.
+
+**Action.** None. Update the package and rebuild the theme's assets (the
+toggle is bundled into the theme's `block-defaults.jsx` entry).
+
+---
+
 ## 0.2.12 → 0.2.13
 
 Not breaking: nothing changes until a site edits its own code.
