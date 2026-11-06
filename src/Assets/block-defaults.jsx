@@ -118,12 +118,23 @@ const NO_VERT_MARGIN_CLASS = 'is-style-no-vert-margin';
 // WP 7.1 (Gutenberg 23.3) moved the Layout panel into the Styles tab and
 // added the "layout" InspectorControls group. Older versions warn and render
 // nothing for an unknown group, so we fall back to our own panel there.
-// There is no public version flag, so detect it by an export that shipped in
-// the same release.
 // https://github.com/WordPress/gutenberg/pull/77922
-const HAS_LAYOUT_CONTROLS_GROUP =
-  'getDimensionsClassesAndStyles' in wp.blockEditor ||
-  '__experimentalGetDimensionsClassesAndStyles' in wp.blockEditor;
+//
+// Check the WordPress version, not a block-editor export: exports can ship
+// before the group does (getDimensionsClassesAndStyles is already in 7.0,
+// where the toggle then rendered nowhere). WordPress puts the version on the
+// admin <body> as "version-7-0-8" (wp-admin/admin-header.php). If it isn't
+// there, use our own panel, which shows on every version.
+function wpVersionAtLeast(major, minor) {
+  const match = /(?:^|\s)version-(\d+)-(\d+)/.exec(document.body?.className || '');
+  if (!match) {
+    return false;
+  }
+  const [wpMajor, wpMinor] = [Number(match[1]), Number(match[2])];
+  return wpMajor > major || (wpMajor === major && wpMinor >= minor);
+}
+
+const HAS_LAYOUT_CONTROLS_GROUP = wpVersionAtLeast(7, 1);
 
 function hasClass(className, name) {
   return (className || '').split(/\s+/).includes(name);
