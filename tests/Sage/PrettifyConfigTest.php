@@ -36,4 +36,18 @@ class PrettifyConfigTest extends TestCase
         $this->assertNotEmpty($hooks);
         $this->assertContains('the_permalink', $hooks);
     }
+
+    public function test_term_links_stay_absolute(): void
+    {
+        // Yoast reads get_term_link() for term sitemaps, canonicals and
+        // og:url, and sitemap <loc> values must be absolute URLs.
+        $this->assertNotContains('term_link', prettify_config()['relative-urls']['hooks']);
+    }
+
+    public function test_attachment_urls_stay_absolute(): void
+    {
+        // Yoast's schema reads wp_get_attachment_url() for image
+        // contentUrl/thumbnailUrl, which Google expects to be absolute.
+        $this->assertNotContains('wp_get_attachment_url', prettify_config()['relative-urls']['hooks']);
+    }
 }

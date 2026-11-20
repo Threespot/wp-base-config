@@ -105,7 +105,10 @@ function prettify_config() {
                 'the_permalink',
                 'wp_list_pages',
                 'wp_list_categories',
-                'wp_get_attachment_url',
+                // 'wp_get_attachment_url' is left out on purpose (it is in
+                // Acorn's default list). Yoast's schema reads it, so filtering
+                // it made image contentUrl/thumbnailUrl (the site logo
+                // included) relative, and Google expects absolute image URLs.
                 'the_content_more_link',
                 'the_tags',
                 'get_pagenum_link',
@@ -113,7 +116,11 @@ function prettify_config() {
                 'month_link',
                 'day_link',
                 'year_link',
-                'term_link',
+                // 'term_link' is left out on purpose (it is in Acorn's default
+                // list). Yoast builds term archive URLs with get_term_link(),
+                // so filtering it makes the taxonomy XML sitemaps, canonical
+                // links, og:url and schema @id relative. Sitemap <loc> values
+                // must be absolute, so search engines reject those entries.
                 'the_author_posts_link',
                 'script_loader_src',
                 'style_loader_src',

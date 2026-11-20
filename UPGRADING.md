@@ -9,6 +9,79 @@ agent can be pointed at this file and asked to bring a site up to date.
 
 ---
 
+## 0.2.14 → 0.2.15
+
+Not breaking: term and attachment URLs become absolute again, with no code
+change needed on most sites.
+
+### Term and attachment URLs are no longer made relative
+
+**What changed.** `prettify_config()` no longer lists `term_link` or
+`wp_get_attachment_url` among the `relative-urls` hooks.
+
+- With `term_link` listed, `get_term_link()` returned a relative path, and
+  Yoast uses that function for term archives: their XML sitemap `<loc>`
+  values, canonical link, `og:url` and schema `@id` all came out relative.
+  Sitemap URLs must be absolute, so search engines reject those entries. Seen
+  on GIH, where all 73 term archive URLs in the taxonomy sitemaps were
+  relative.
+- With `wp_get_attachment_url` listed, Yoast's schema gave images (the site
+  logo included) a relative `contentUrl` and `thumbnailUrl`. Google expects
+  absolute image URLs there.
+
+Image `src` and `srcset` values that WordPress builds for attachments also
+become absolute. Browsers treat both forms the same.
+
+**Action.**
+1. If the theme's `config/prettify.php` assigns
+   `$config['relative-urls']['hooks']` wholesale and that list includes
+   `'term_link'` or `'wp_get_attachment_url'`, remove them. Sites that only
+   call `prettify_config()` need no change.
+2. Fix the URLs Yoast already saved. Updating the package does not change
+   them, and they keep coming out relative on the front end (seen on GIH
+   dev). Yoast saves URLs when it builds a page's SEO data (its "indexables")
+   during a page view, so only environments that served pages with the old
+   config are affected, usually live. On each environment, after deploying:
+   1. Count the affected rows:
+      `wp db query "SELECT COUNT(*) FROM wp_yoast_indexable WHERE permalink LIKE '/%' OR open_graph_image LIKE '/%' OR twitter_image LIKE '/%'"`
+   2. If the count is above 0, save the script below as a file and run
+      `wp eval-file <file> run`. It rebuilds only those rows (seconds, where
+      `wp yoast index --reindex` rebuilds everything and took over 10
+      minutes on GIH dev), and prints the count before and after, which
+      should end at 0.
+   3. Clear the logo URL Yoast saved in its settings. Yoast rebuilds it on
+      the next page view:
+      `wp eval 'WPSEO_Options::set("company_logo_meta", false);'`
+   4. Clear the page cache.
+
+   ```php
+   <?php
+   use Yoast\WP\SEO\Builders\Indexable_Builder;
+   use Yoast\WP\SEO\Repositories\Indexable_Repository;
+
+   global $wpdb;
+   $table = $wpdb->prefix . 'yoast_indexable';
+   $where = "permalink LIKE '/%' OR open_graph_image LIKE '/%' OR twitter_image LIKE '/%'";
+   echo 'Before: ' . $wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE {$where}") . "\n";
+   if (!in_array('run', (array) ($args ?? []), true)) {
+       return;
+   }
+   $repo = YoastSEO()->classes->get(Indexable_Repository::class);
+   $builder = YoastSEO()->classes->get(Indexable_Builder::class);
+   foreach ($wpdb->get_results("SELECT object_id, object_type FROM {$table} WHERE {$where}") as $row) {
+       $indexable = $repo->find_by_id_and_type((int) $row->object_id, $row->object_type, false);
+       if ($indexable) {
+           $builder->build_for_id_and_type((int) $row->object_id, $row->object_type, $indexable);
+       }
+   }
+   echo 'After: ' . $wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE {$where}") . "\n";
+   ```
+3. Check the result: every `<loc>` in a taxonomy sitemap (for example
+   `/category-sitemap.xml`) starts with `https://`, and so do a term
+   archive's `og:url` and the home page's schema `logo.contentUrl`.
+
+---
+
 ## 0.2.13 → 0.2.14
 
 Not breaking: no action needed.
