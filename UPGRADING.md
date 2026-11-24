@@ -9,6 +9,53 @@ agent can be pointed at this file and asked to bring a site up to date.
 
 ---
 
+## 0.2.15 → 0.2.16
+
+Not breaking: a method is renamed with a deprecated alias, empty headings are
+now stripped too, and the File block no longer shows a PDF preview.
+
+### `stripEmptyParagraphs()` is now `stripEmptyElements()`
+
+**What changed.** `BlockConfig::stripEmptyParagraphs()` is renamed
+`BlockConfig::stripEmptyElements()`, and it removes empty `<h1>`-`<h6>` as well
+as empty `<p>`. "Empty" means the same as before: only whitespace, `&nbsp;`,
+U+00A0 or `<br>`, whatever the attributes (an empty heading with an `id` is
+removed too). CSS `:empty` rules could hide empty headings, but a hidden element
+still counts for `:first-child` / `:last-child`, and `:empty` doesn't match an
+element holding only a space or `&nbsp;`.
+
+`stripEmptyParagraphs()` still works as a deprecated alias of the new method
+(it strips headings too) and calls `_deprecated_function()`, which logs a notice
+when `WP_DEBUG` is on.
+
+**Action.**
+1. Search the site for `stripEmptyParagraphs` and change each call to
+   `stripEmptyElements`.
+2. A `remove_filter('the_content', [BlockConfig::class, 'stripEmptyParagraphs'])`
+   no longer removes anything, because the package now registers
+   `stripEmptyElements`. Change the name in the `remove_filter()` call (and the
+   `acf_the_content` one, priority 20).
+3. If the theme has its own code that removes empty headings, it can go.
+
+**Removal.** Remove the `stripEmptyParagraphs()` alias (and
+`tests/MuPlugins/BlockConfigDeprecationTest.php`) in the next major version of
+wp-base-config. Sites must use `stripEmptyElements()` by then.
+
+### The File block's PDF preview is removed
+
+**What changed.** No inline PDF viewer we've tested is accessible (WordPress's
+own `<object>` embed, Adobe's embed), so the File block is a download link only:
+
+- `gutenberg-defaults.js` turns "Show inline embed" off whenever the editor sets
+  it (the File block turns it on when a PDF is chosen).
+- `customizeBlockMarkup()` removes the `<object class="wp-block-file__embed">`
+  from File blocks saved earlier with the preview on. Before, it only added
+  `aria-hidden="true"` to it.
+
+**Action.**
+1. Rebuild the theme so its editor bundle picks up `gutenberg-defaults.js`.
+2. Theme styles for `.wp-block-file__embed` can be deleted.
+
 ## 0.2.14 → 0.2.15
 
 Not breaking: term and attachment URLs become absolute again, with no code

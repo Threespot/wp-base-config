@@ -36,10 +36,10 @@ class BlockConfig
         add_filter('block_categories_all', [self::class, 'addBlockCategory'], 10);
         add_action('init', [self::class, 'addPatternCategory'], 10);
         add_action('init', [self::class, 'unregisterBlockBindingsSources'], 100);
-        add_filter('the_content', [self::class, 'stripEmptyParagraphs']);
+        add_filter('the_content', [self::class, 'stripEmptyElements']);
         // Priority 20: ACF registers wpautop on acf_the_content at priority 10 when the
         // plugin loads (after mu-plugins), so at 10 this would run before wpautop.
-        add_filter('acf_the_content', [self::class, 'stripEmptyParagraphs'], 20);
+        add_filter('acf_the_content', [self::class, 'stripEmptyElements'], 20);
         add_filter('wp_content_img_tag', [self::class, 'stripAutoSizesFromContent']);
         add_filter('wp_get_attachment_image_attributes', [self::class, 'stripAutoSizesFromAttachment']);
         add_filter('register_block_type_args', [self::class, 'disableHeadingLevels'], 10, 2);
@@ -122,22 +122,37 @@ class BlockConfig
     }
 
     /**
-     * Strip empty paragraphs from post content and ACF wysiwyg output.
+     * Strip empty paragraphs and headings from post content and ACF wysiwyg output.
      *
-     * Strips a <p> with no content regardless of its attributes (class, id, style),
-     * so an empty paragraph used only as an HTML anchor is removed too. Content that
-     * counts as empty: whitespace, &nbsp;, a literal U+00A0 (pasted from Word), and
-     * <br>. The /u flag makes \s match U+00A0 (bytes C2 A0), not just ASCII space.
-     * Not handled: &#160;, &#xA0;, zero-width spaces, uppercase <P>.
+     * Strips a <p> or <h1>-<h6> with no content regardless of its attributes (class,
+     * id, style), so an empty element used only as an HTML anchor is removed too.
+     * Content that counts as empty: whitespace, &nbsp;, a literal U+00A0 (pasted from
+     * Word), and <br>. The /u flag makes \s match U+00A0 (bytes C2 A0), not just ASCII
+     * space. Not handled: &#160;, &#xA0;, zero-width spaces, uppercase tags.
      *
-     * CSS could hide them, but they still affect first/last/nth-child selectors.
+     * CSS could hide them, but they still affect first/last/nth-child selectors, and
+     * :empty doesn't match an element that holds only a space or &nbsp;.
      */
-    public static function stripEmptyParagraphs(string $content): string
+    public static function stripEmptyElements(string $content): string
     {
-        $result = preg_replace('/<p(?:\s[^>]*)?>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>/u', '', $content);
+        $result = preg_replace('/<(p|h[1-6])(?:\s[^>]*)?>(?:\s|&nbsp;|<br\s*\/?>)*<\/\1>/u', '', $content);
 
         // preg_replace returns null on malformed UTF-8; keep the content untouched.
         return $result ?? $content;
+    }
+
+    /**
+     * Old name for stripEmptyElements(), kept so sites that call it directly keep
+     * working. It strips empty headings too, like the new name.
+     *
+     * @deprecated 0.2.16 Use stripEmptyElements(). Remove this alias in the next
+     *             major version of wp-base-config (see UPGRADING.md).
+     */
+    public static function stripEmptyParagraphs(string $content): string
+    {
+        _deprecated_function(__METHOD__, '0.2.16', self::class . '::stripEmptyElements');
+
+        return self::stripEmptyElements($content);
     }
 
     /**
@@ -213,10 +228,12 @@ class BlockConfig
             $block_content = str_replace('<img', '<img loading="lazy"', $block_content);
         }
 
-        // File: hide embed, add file info to button
+        // File: remove the PDF preview, add file info to button
         if ($block['blockName'] === 'core/file') {
-            // Hide inaccessible PDF viewer from screen readers
-            $block_content = str_replace('<object class="wp-block-file__embed"', '<object aria-hidden="true" class="wp-block-file__embed"', $block_content);
+            // No inline PDF viewer we've tested is accessible (WordPress's own <object>
+            // embed, Adobe's embed), so the File block is a download link only. This
+            // removes previews saved before gutenberg-defaults.js turned them off.
+            $block_content = preg_replace('#<object\b[^>]*\bwp-block-file__embed\b[^>]*>.*?</object>#s', '', $block_content) ?? $block_content;
 
             $id = $block['attrs']['id'] ?? null;
             $path = $id ? get_attached_file($id) : false;
