@@ -228,12 +228,10 @@ class BlockConfig
             $block_content = str_replace('<img', '<img loading="lazy"', $block_content);
         }
 
-        // File: remove the PDF preview, add file info to button
+        // File: hide embed, add file info to button
         if ($block['blockName'] === 'core/file') {
-            // No inline PDF viewer we've tested is accessible (WordPress's own <object>
-            // embed, Adobe's embed), so the File block is a download link only. This
-            // removes previews saved before gutenberg-defaults.js turned them off.
-            $block_content = preg_replace('#<object\b[^>]*\bwp-block-file__embed\b[^>]*>.*?</object>#s', '', $block_content) ?? $block_content;
+            // Hide inaccessible PDF viewer from screen readers
+            $block_content = str_replace('<object class="wp-block-file__embed"', '<object aria-hidden="true" class="wp-block-file__embed"', $block_content);
 
             $id = $block['attrs']['id'] ?? null;
             $path = $id ? get_attached_file($id) : false;
