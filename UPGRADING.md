@@ -41,6 +41,8 @@ when `WP_DEBUG` is on.
 `tests/MuPlugins/BlockConfigDeprecationTest.php`) in the next major version of
 wp-base-config. Sites must use `stripEmptyElements()` by then.
 
+---
+
 ## 0.2.14 → 0.2.15
 
 Not breaking: term and attachment URLs become absolute again, with no code
