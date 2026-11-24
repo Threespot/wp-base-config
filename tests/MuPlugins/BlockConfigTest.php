@@ -7,7 +7,7 @@ use PHPUnit\Framework\TestCase;
 use Threespot\Wp\MuPlugins\BlockConfig;
 
 /**
- * Behavior tests for BlockConfig::stripEmptyParagraphs().
+ * Behavior tests for BlockConfig::stripEmptyElements().
  *
  * Extends TestCase rather than BrainMonkeyTestCase because the method is a
  * pure string transform that calls no WordPress functions.
@@ -17,7 +17,7 @@ class BlockConfigTest extends TestCase
     /**
      * @return iterable<string, array{string}>
      */
-    public static function emptyParagraphs(): iterable
+    public static function emptyElements(): iterable
     {
         yield 'bare' => ['<p></p>'];
         yield 'empty class (Gutenberg)' => ['<p class=""></p>'];
@@ -31,15 +31,19 @@ class BlockConfigTest extends TestCase
         yield 'mixed' => ["<p>&nbsp;\u{00A0}<br/>\n</p>"];
         yield 'adjacent' => ['<p></p><p></p>'];
         yield 'newline-separated' => ["<p>&nbsp;</p>\n<p>&nbsp;</p>"];
+        yield 'empty heading (Gutenberg)' => ['<h2 class="wp-block-heading"></h2>'];
+        yield 'h1' => ['<h1></h1>'];
+        yield 'h6 with nbsp' => ['<h6 id="x">&nbsp;</h6>'];
+        yield 'heading with br' => ['<h3><br></h3>'];
     }
 
-    #[DataProvider('emptyParagraphs')]
-    public function test_strips_empty_paragraph(string $html): void
+    #[DataProvider('emptyElements')]
+    public function test_strips_empty_element(string $html): void
     {
-        $result = BlockConfig::stripEmptyParagraphs('<a>before</a>' . $html . '<a>after</a>');
+        $result = BlockConfig::stripEmptyElements('<a>before</a>' . $html . '<a>after</a>');
 
-        // Whitespace between stripped paragraphs may remain; only <p> must be gone.
-        $this->assertStringNotContainsString('<p', $result);
+        // Whitespace between stripped elements may remain; only the elements must be gone.
+        $this->assertDoesNotMatchRegularExpression('/<(p|h[1-6])\\b/', $result);
         $this->assertStringStartsWith('<a>before</a>', $result);
         $this->assertStringEndsWith('<a>after</a>', $result);
     }
@@ -47,27 +51,30 @@ class BlockConfigTest extends TestCase
     /**
      * @return iterable<string, array{string}>
      */
-    public static function nonEmptyParagraphs(): iterable
+    public static function nonEmptyElements(): iterable
     {
         yield 'text' => ['<p>Keep me</p>'];
         yield 'text with class' => ['<p class="lead">Keep me</p>'];
         yield 'nbsp around text' => ['<p>&nbsp;Keep&nbsp;</p>'];
         yield 'more anchor' => ['<p><span id="more-1"></span></p>'];
         yield 'other tag starting with p' => ['<pre></pre><param><picture></picture>'];
+        yield 'heading text' => ['<h2 class="wp-block-heading">Keep me</h2>'];
+        yield 'header element' => ['<header></header><hr>'];
+        yield 'mismatched tags' => ['<h2></h3>'];
         // Word indents with long runs of NBSP; must not hit the backtrack limit.
         yield 'many leading NBSP then text' => ['<p>' . str_repeat("\u{00A0}", 40) . 'Indented</p>'];
     }
 
-    #[DataProvider('nonEmptyParagraphs')]
-    public function test_keeps_non_empty_paragraph(string $html): void
+    #[DataProvider('nonEmptyElements')]
+    public function test_keeps_non_empty_element(string $html): void
     {
-        $this->assertSame($html, BlockConfig::stripEmptyParagraphs($html));
+        $this->assertSame($html, BlockConfig::stripEmptyElements($html));
     }
 
     public function test_returns_input_unchanged_on_malformed_utf8(): void
     {
         $html = "<p>caf\xE9</p><p></p>";
 
-        $this->assertSame($html, BlockConfig::stripEmptyParagraphs($html));
+        $this->assertSame($html, BlockConfig::stripEmptyElements($html));
     }
 }
