@@ -11,8 +11,8 @@ agent can be pointed at this file and asked to bring a site up to date.
 
 ## 0.2.15 → 0.2.16
 
-Not breaking: a method is renamed with a deprecated alias, empty headings are
-now stripped too, and the File block no longer shows a PDF preview.
+Not breaking: a method is renamed with a deprecated alias, and empty headings
+are now stripped too.
 
 ### `stripEmptyParagraphs()` is now `stripEmptyElements()`
 
@@ -40,21 +40,6 @@ when `WP_DEBUG` is on.
 **Removal.** Remove the `stripEmptyParagraphs()` alias (and
 `tests/MuPlugins/BlockConfigDeprecationTest.php`) in the next major version of
 wp-base-config. Sites must use `stripEmptyElements()` by then.
-
-### The File block's PDF preview is removed
-
-**What changed.** No inline PDF viewer we've tested is accessible (WordPress's
-own `<object>` embed, Adobe's embed), so the File block is a download link only:
-
-- `gutenberg-defaults.js` turns "Show inline embed" off whenever the editor sets
-  it (the File block turns it on when a PDF is chosen).
-- `customizeBlockMarkup()` removes the `<object class="wp-block-file__embed">`
-  from File blocks saved earlier with the preview on. Before, it only added
-  `aria-hidden="true"` to it.
-
-**Action.**
-1. Rebuild the theme so its editor bundle picks up `gutenberg-defaults.js`.
-2. Theme styles for `.wp-block-file__embed` can be deleted.
 
 ## 0.2.14 → 0.2.15
 

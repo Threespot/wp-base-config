@@ -42,29 +42,6 @@ wp.domReady(() => {
     }
   );
 
-  // File: no inline PDF preview, a download link only. No PDF viewer we've
-  // tested is accessible (WordPress's own <object> embed, Adobe's embed). The
-  // File block turns the preview on when a PDF is chosen, so turn it back off.
-  // customizeBlockMarkup() in /src/MuPlugins/BlockConfig.php removes previews
-  // saved before this change.
-  wp.hooks.addFilter(
-    'editor.BlockEdit',
-    'threespot/file-without-preview',
-    wp.compose.createHigherOrderComponent((BlockEdit) => {
-      return function FileWithoutPreview(props) {
-        const hasPreview = props.name === 'core/file' && !!props.attributes.displayPreview;
-
-        wp.element.useEffect(() => {
-          if (hasPreview) {
-            props.setAttributes({ displayPreview: false });
-          }
-        }, [hasPreview]);
-
-        return wp.element.createElement(BlockEdit, props);
-      };
-    }, 'withoutFilePreview')
-  );
-
   // Register custom styles
   wp.blocks.registerBlockStyle('core/button', {
     name: 'link',
