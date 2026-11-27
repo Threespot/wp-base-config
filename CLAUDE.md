@@ -54,7 +54,7 @@ Never introduce Unicode smart quotes or curly quotes in any code file (PHP, JS, 
    hook. No constructor, no instance state.
 3. **Filter naming:** `threespot/<area>/<key>` (forward slashes).
    `<area>` matches the module slug: `login`, `admin`, `assets`, `blocks`,
-   `acf`, `theme`, `smtp`, `taxonomy`, `critical`, `helpers`.
+   `acf`, `theme`, `smtp`, `taxonomy`, `critical`, `facetwp`, `helpers`.
 4. **Defaults are class constants** (`DEFAULT_FOO = [...]`) passed as the
    second arg to `apply_filters(...)`. This lets tests assert on the
    default list without instantiating WP.
