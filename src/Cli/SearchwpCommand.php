@@ -5,10 +5,9 @@ namespace Threespot\Wp\Cli;
 use InvalidArgumentException;
 
 /**
- * `wp threespot searchwp ...`: copy SearchWP engine settings between
- * environments.
+ * Copies SearchWP engine settings between environments.
  *
- * SearchWP keeps its engines in the database (the searchwp_engines option),
+ * `wp threespot searchwp export-engines` and `apply-engines`. SearchWP keeps its engines in the database (the searchwp_engines option),
  * so each environment otherwise has to be set up by hand in the admin.
  * Export the engines where they're right, commit the JSON, then apply it on
  * each environment and rebuild the index.
