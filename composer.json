@@ -24,6 +24,7 @@
         },
         "files": [
             "src/Helpers/author.php",
+            "src/Helpers/facetwp.php",
             "src/Helpers/general.php",
             "src/Helpers/image.php",
             "src/Helpers/menu.php",

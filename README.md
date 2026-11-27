@@ -21,7 +21,7 @@ Two kinds of code:
 
 **MU-plugin modules** (`src/MuPlugins/*Config.php`) register WordPress hooks
 and ship as a single mu-plugin. They survive theme swaps, exactly like the
-legacy `app/*-config.php` files did. The ten modules cover:
+legacy `app/*-config.php` files did. The eleven modules cover:
 
 | Module | Responsibility |
 |---|---|
@@ -32,14 +32,15 @@ legacy `app/*-config.php` files did. The ten modules cover:
 | `BlockConfig`    | Block editor polish: custom category, h1 → h2, lazy iframes, editor CSS/JS |
 | `ContentTypesConfig` | Auto-loads site-level CPT/taxonomy definitions from a fixed mu-plugins convention; auto-applies taxonomy `query_var` filters to archive queries |
 | `CriticalConfig` | Inline critical `<script>` in `<head>` — `no-js`/`js` swap, iOS / old-Safari UA classes |
+| `FacetwpConfig`  | FacetWP: New Relic off on refreshes; opt-in pager hrefs, `<select>` labels and a11y-script override. See [FacetWP](#facetwp) |
 | `LoginConfig`    | `/wp-login.php` logo URL/text and custom stylesheet enqueue |
 | `SmtpConfig`     | PHPMailer override (Mailhog on Lando by default) |
 | `ThemeConfig`    | `add_theme_support` calls, archive-title cleanup, excerpt format |
 
 **Helper functions** (`src/Helpers/*.php`, namespace `Threespot\Wp\Helpers`)
 are pure PHP utilities autoloaded via Composer's `autoload.files`. Templates
-call them directly. The four files mirror the legacy `app/` layout:
-`general.php`, `image.php`, `svg.php`, `taxonomy.php`.
+call them directly. Most mirror the legacy `app/` layout: `general.php`,
+`image.php`, `svg.php`, `taxonomy.php`; `facetwp.php` backs `FacetwpConfig`.
 
 A small **public API** (`src/PublicApi/functions.php`) exposes global
 `threespot_*` helpers — `threespot_remove_dashboard_widget(...)`,
@@ -343,6 +344,46 @@ namespace App;
 function img_tag(...$args) { return \Threespot\Wp\Helpers\img_tag(...$args); }
 function svg(...$args)     { return \Threespot\Wp\Helpers\svg(...$args); }
 ```
+
+## FacetWP
+
+`FacetwpConfig` holds the FacetWP fixes GIH, NMHC and Mosaic each copied into
+their themes. It hooks in whether or not FacetWP is active (mu-plugins load
+first) and does nothing without it. Each fix sits behind its own filter, and
+each one leaves alone anything a theme's own filter already changed, so a site
+can keep its copy until it switches over.
+
+| Fix | Filter | Default | Why |
+|---|---|---|---|
+| Turn off New Relic's browser snippet on refreshes | `threespot/facetwp/disable_newrelic_on_refresh` | on | New Relic adds the snippet to the JSON a refresh returns, which breaks it, and every facet spins forever. All three sites do this. |
+| Force FacetWP's a11y script off | `threespot/facetwp/disable_a11y_script` | off | The script names each `<select>` after its selected option ("All"), hiding the visible label. But a site whose pager links have no `href` needs it: it's what makes them reachable by keyboard. |
+| Real `href` on pager links | `threespot/facetwp/pager_link_hrefs` | off | Deep pages work without JavaScript and can be crawled. FacetWP's click handler doesn't call `preventDefault()`, so the theme also needs a delegated click listener on `a.facetwp-page[href]` that does, or every click loads the page. |
+| `aria-labelledby` on dropdown and sort `<select>`s | `threespot/facetwp/select_labelledby` | off | FacetWP replaces the facet's inner markup on every refresh, so the visible label sits outside it and the `<select>` points at it. The theme must print the label with the id from `threespot/facetwp/select_label_id`. |
+
+To turn on the opt-in fixes (NMHC and Mosaic use all three):
+
+```php
+add_filter('threespot/facetwp/disable_a11y_script', '__return_true');
+add_filter('threespot/facetwp/pager_link_hrefs', '__return_true');
+add_filter('threespot/facetwp/select_labelledby', '__return_true');
+
+// Point a sort facet at a shared "Sort by" label
+add_filter('threespot/facetwp/select_label_id', fn ($id, $facet) =>
+    ($facet['type'] ?? '') === 'sort' ? 'archive-filters-sort-label' : $id, 10, 2);
+
+// Leave a one-off query arg out of pager links
+add_filter('threespot/facetwp/page_url_args', function ($args) {
+    unset($args['persona']);
+    return $args;
+});
+```
+
+Pager `href`s carry the request's own query args (unslashed on page load,
+decoded on a refresh) and each facet's current selection, and drop a
+trailing `page/<n>`. To keep a site's search form filters when the keyword
+changes, print `facetwp_hidden_vars($get, $facet_names)` as hidden inputs: it
+returns the active `_<facet>` vars, leaving out `paged`, `pager`, `reset` and
+`result_count`.
 
 ## Registering custom post types and taxonomies
 
@@ -714,6 +755,12 @@ point of enqueue and the site supplies the URL.
 | `threespot/blocks/disabled_heading_levels` | `[1]`                      | Heading levels stripped from `core/heading` |
 | `threespot/blocks/pattern_category`       | `['slug'=>'threespotblock', 'label'=>'Custom Patterns']` | Custom pattern category |
 | `threespot/blocks/vimeo_color`            | `'ff5100'`                  | Read by `format_video_iframe()` helper |
+| `threespot/facetwp/disable_a11y_script`   | `false`                     | Forces FacetWP's "Load a11y support" setting off. See [FacetWP](#facetwp) |
+| `threespot/facetwp/disable_newrelic_on_refresh` | `true`                | Turns off New Relic's browser snippet on FacetWP refreshes |
+| `threespot/facetwp/page_url_args`         | request args + facet selections + `_paged` | Query args of a pager link's `href`; receives the page number |
+| `threespot/facetwp/pager_link_hrefs`      | `false`                     | Gives FacetWP pager links a real `href` |
+| `threespot/facetwp/select_label_id`       | `'facet-label-<name>'`      | Id a facet's `<select>` points at; receives the facet array. `''` skips the facet |
+| `threespot/facetwp/select_labelledby`     | `false`                     | Adds `aria-labelledby` to dropdown and sort `<select>`s |
 | `threespot/helpers/excluded_post_types`   | `['ifso_triggers']`         | Post types stripped from `get_custom_post_types()` |
 | `threespot/helpers/is_live_env`           | `PANTHEON_ENVIRONMENT === 'live'` | Return value of `is_live_env()` |
 | `threespot/helpers/is_pantheon`           | `PANTHEON_ENVIRONMENT` set and not `'lando'` | Return value of `is_pantheon()` |
@@ -767,6 +814,7 @@ All live in the `Threespot\Wp\Helpers` namespace, autoloaded via Composer.
 |---|---|
 | `general.php` | `is_pantheon`, `is_live_env`, `bytes_to_human_size`, `strip_p_tags`, `is_external`, `nowrap`, `trim_excerpt`, `clean_wysiwyg_markup`, `strip_quotes`, `obfuscate`, `get_custom_post_types`, `format_video_iframe` (plus the deprecated `is_production`, which wraps `is_pantheon` and also applies its own filter) |
 | `image.php`   | `calculate_height`, `get_registered_image_sizes`, `blank_gif`, `get_image_file_type`, `bis_get_sizes`, `bis_srcset`, `buildAttributes`, `img_tag`, `get_img_alt`, `get_img_focal_point`, `resolve_bis_crop_param`, `set_img_alt` (plus `fly_*` deprecated aliases) |
+| `facetwp.php` | `facetwp_request_get`, `facetwp_page_path`, `facetwp_page_query_args`, `facetwp_add_href`, `facetwp_add_labelledby`, `facetwp_hidden_vars`. See [FacetWP](#facetwp) |
 | `svg.php`     | `svg`, `append_icon` |
 | `taxonomy.php` | `get_primary_term` |
 
@@ -856,11 +904,13 @@ threespot/wp-base-config/
     │   ├── BlockConfig.php
     │   ├── ContentTypesConfig.php
     │   ├── CriticalConfig.php
+    │   ├── FacetwpConfig.php
     │   ├── LoginConfig.php
     │   ├── SmtpConfig.php
     │   └── ThemeConfig.php
     ├── Helpers/                                 # autoloaded namespaced functions
     │   ├── author.php
+    │   ├── facetwp.php
     │   ├── general.php
     │   ├── image.php
     │   ├── menu.php
