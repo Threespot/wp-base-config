@@ -220,6 +220,12 @@ return array_replace_recursive(
 list *by index*, so to change that list assign it wholesale in the override
 array rather than relying on the recursive merge.
 
+Nice Search (redirecting `/?s=query` to `/search/query/`) is off by default:
+an empty search lands on `/search/` and 404s, URLs with `&` (FacetWP filters)
+are skipped, and every search takes an extra redirect that turns spaces into
+`+`. To turn it on for a site, add `'nice-search' => ['enabled' => true]` to the
+override array.
+
 ### Tweak defaults via the public API
 
 The defaults reflect what the legacy theme files did. Site-specific deltas go
