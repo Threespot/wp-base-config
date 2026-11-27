@@ -42,6 +42,9 @@ are pure PHP utilities autoloaded via Composer's `autoload.files`. Templates
 call them directly. Most mirror the legacy `app/` layout: `general.php`,
 `image.php`, `svg.php`, `taxonomy.php`; `facetwp.php` backs `FacetwpConfig`.
 
+**WP-CLI commands** (`src/Cli/`) register only when WP-CLI is running. See
+[SearchWP engines](#searchwp-engines).
+
 A small **public API** (`src/PublicApi/functions.php`) exposes global
 `threespot_*` helpers — `threespot_remove_dashboard_widget(...)`,
 `threespot_no_defer_script(...)`, etc. — so per-site overrides stay
@@ -384,6 +387,32 @@ trailing `page/<n>`. To keep a site's search form filters when the keyword
 changes, print `facetwp_hidden_vars($get, $facet_names)` as hidden inputs: it
 returns the active `_<facet>` vars, leaving out `paged`, `pager`, `reset` and
 `result_count`.
+
+## SearchWP engines
+
+SearchWP keeps its engine settings in the database, so each environment
+otherwise has to be set up by hand in the admin. Two WP-CLI commands copy them
+as JSON:
+
+```bash
+# Where the engines are right: save them and commit the file
+wp threespot searchwp export-engines config/searchwp-engines.json
+
+# On each environment: replace every engine with the file's, then reindex
+wp threespot searchwp apply-engines config/searchwp-engines.json
+wp searchwp index --rebuild
+```
+
+- `export-engines` prints to the screen when no file is given.
+- `apply-engines` replaces every engine (one missing from the file is
+  removed). It saves through SearchWP's own import, which checks each engine
+  and flags the index as out of date, then reminds you to rebuild it.
+- Both stop with an error when SearchWP isn't active.
+- On Pantheon: `terminus wp <site>.<env> -- threespot searchwp apply-engines /code/config/searchwp-engines.json`.
+
+The commands sit under the same `wp threespot` parent as
+[threespot/wp-fixtures](https://github.com/threespot/wp-fixtures)'
+`wp threespot fixtures`.
 
 ## Registering custom post types and taxonomies
 
@@ -882,7 +911,7 @@ entries narrow so real secrets are never masked.
 threespot/wp-base-config/
 ├── composer.json                                # type: library
 ├── UPGRADING.md                                 # breaking changes and deprecations: filters / public names / unhookable callbacks
-├── bootstrap.php                                # registers all MU-plugin modules
+├── bootstrap.php                                # registers all MU-plugin modules and WP-CLI commands
 ├── mu-plugins/
 │   ├── threespot-wp-base-config.php             # WP loader; symlink into web/app/mu-plugins/
 │   ├── acf-local-json-autosync.php              # optional drop-in; copy per-site — see "Standalone drop-in mu-plugins"
@@ -896,6 +925,8 @@ threespot/wp-base-config/
 │   ├── vite-base.js                             # consumed via mergeConfig — see "Vite: shared base + per-project wrapper"
 │   └── package.json                             # {"type": "module"} — see "Why dist/package.json exists"
 └── src/
+    ├── Cli/                                     # WP-CLI commands (WP-CLI only)
+    │   └── SearchwpCommand.php                  # wp threespot searchwp export-engines / apply-engines
     ├── MuPlugins/                               # named-callback hook modules
     │   ├── AcfConfig.php
     │   ├── AcornConfig.php
