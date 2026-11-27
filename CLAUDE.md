@@ -29,6 +29,10 @@ Never introduce Unicode smart quotes or curly quotes in any code file (PHP, JS, 
   because sites own and edit their copies directly. Each drop-in must be
   self-documenting via its plugin header and listed in the README's
   "Standalone drop-in mu-plugins" table.
+- `src/Cli/` holds WP-CLI command classes (namespace `Threespot\Wp\Cli`).
+  `bootstrap.php` registers them only when `WP_CLI` is defined, under the
+  `threespot` parent command that threespot/wp-fixtures also uses. Commands
+  check for the plugin they need when they run, not at registration.
 - `src/Sage/` holds Acorn/Vite-aware adapters. These are the ONLY files in
   the package that may `use Illuminate\Support\Facades\*`. Everything in
   `src/MuPlugins/` and `src/Helpers/` must run on plain WP without Acorn.
@@ -50,7 +54,7 @@ Never introduce Unicode smart quotes or curly quotes in any code file (PHP, JS, 
    hook. No constructor, no instance state.
 3. **Filter naming:** `threespot/<area>/<key>` (forward slashes).
    `<area>` matches the module slug: `login`, `admin`, `assets`, `blocks`,
-   `acf`, `theme`, `smtp`, `taxonomy`, `critical`, `helpers`.
+   `acf`, `theme`, `smtp`, `taxonomy`, `critical`, `facetwp`, `helpers`.
 4. **Defaults are class constants** (`DEFAULT_FOO = [...]`) passed as the
    second arg to `apply_filters(...)`. This lets tests assert on the
    default list without instantiating WP.

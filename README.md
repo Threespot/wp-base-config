@@ -21,7 +21,7 @@ Two kinds of code:
 
 **MU-plugin modules** (`src/MuPlugins/*Config.php`) register WordPress hooks
 and ship as a single mu-plugin. They survive theme swaps, exactly like the
-legacy `app/*-config.php` files did. The ten modules cover:
+legacy `app/*-config.php` files did. The eleven modules cover:
 
 | Module | Responsibility |
 |---|---|
@@ -32,14 +32,18 @@ legacy `app/*-config.php` files did. The ten modules cover:
 | `BlockConfig`    | Block editor polish: custom category, h1 → h2, lazy iframes, editor CSS/JS |
 | `ContentTypesConfig` | Auto-loads site-level CPT/taxonomy definitions from a fixed mu-plugins convention; auto-applies taxonomy `query_var` filters to archive queries |
 | `CriticalConfig` | Inline critical `<script>` in `<head>` — `no-js`/`js` swap, iOS / old-Safari UA classes |
+| `FacetwpConfig`  | FacetWP: New Relic off on refreshes; opt-in pager hrefs, `<select>` labels and a11y-script override. See [FacetWP](#facetwp) |
 | `LoginConfig`    | `/wp-login.php` logo URL/text and custom stylesheet enqueue |
 | `SmtpConfig`     | PHPMailer override (Mailhog on Lando by default) |
 | `ThemeConfig`    | `add_theme_support` calls, archive-title cleanup, excerpt format |
 
 **Helper functions** (`src/Helpers/*.php`, namespace `Threespot\Wp\Helpers`)
 are pure PHP utilities autoloaded via Composer's `autoload.files`. Templates
-call them directly. The four files mirror the legacy `app/` layout:
-`general.php`, `image.php`, `svg.php`, `taxonomy.php`.
+call them directly. Most mirror the legacy `app/` layout: `general.php`,
+`image.php`, `svg.php`, `taxonomy.php`; `facetwp.php` backs `FacetwpConfig`.
+
+**WP-CLI commands** (`src/Cli/`) register only when WP-CLI is running. See
+[SearchWP engines](#searchwp-engines).
 
 A small **public API** (`src/PublicApi/functions.php`) exposes global
 `threespot_*` helpers — `threespot_remove_dashboard_widget(...)`,
@@ -220,6 +224,12 @@ return array_replace_recursive(
 list *by index*, so to change that list assign it wholesale in the override
 array rather than relying on the recursive merge.
 
+Nice Search (redirecting `/?s=query` to `/search/query/`) is off by default:
+an empty search lands on `/search/` and 404s, URLs with `&` (FacetWP filters)
+are skipped, and every search takes an extra redirect that turns spaces into
+`+`. To turn it on for a site, add `'nice-search' => ['enabled' => true]` to the
+override array.
+
 ### Tweak defaults via the public API
 
 The defaults reflect what the legacy theme files did. Site-specific deltas go
@@ -337,6 +347,72 @@ namespace App;
 function img_tag(...$args) { return \Threespot\Wp\Helpers\img_tag(...$args); }
 function svg(...$args)     { return \Threespot\Wp\Helpers\svg(...$args); }
 ```
+
+## FacetWP
+
+`FacetwpConfig` holds the FacetWP fixes GIH, NMHC and Mosaic each copied into
+their themes. It hooks in whether or not FacetWP is active (mu-plugins load
+first) and does nothing without it. Each fix sits behind its own filter, and
+each one leaves alone anything a theme's own filter already changed, so a site
+can keep its copy until it switches over.
+
+| Fix | Filter | Default | Why |
+|---|---|---|---|
+| Turn off New Relic's browser snippet on refreshes | `threespot/facetwp/disable_newrelic_on_refresh` | on | New Relic adds the snippet to the JSON a refresh returns, which breaks it, and every facet spins forever. All three sites do this. |
+| Force FacetWP's a11y script off | `threespot/facetwp/disable_a11y_script` | off | The script names each `<select>` after its selected option ("All"), hiding the visible label. But a site whose pager links have no `href` needs it: it's what makes them reachable by keyboard. |
+| Real `href` on pager links | `threespot/facetwp/pager_link_hrefs` | off | Deep pages work without JavaScript and can be crawled. FacetWP's click handler doesn't call `preventDefault()`, so the theme also needs a delegated click listener on `a.facetwp-page[href]` that does, or every click loads the page. |
+| `aria-labelledby` on dropdown and sort `<select>`s | `threespot/facetwp/select_labelledby` | off | FacetWP replaces the facet's inner markup on every refresh, so the visible label sits outside it and the `<select>` points at it. The theme must print the label with the id from `threespot/facetwp/select_label_id`. |
+
+To turn on the opt-in fixes (NMHC and Mosaic use all three):
+
+```php
+add_filter('threespot/facetwp/disable_a11y_script', '__return_true');
+add_filter('threespot/facetwp/pager_link_hrefs', '__return_true');
+add_filter('threespot/facetwp/select_labelledby', '__return_true');
+
+// Point a sort facet at a shared "Sort by" label
+add_filter('threespot/facetwp/select_label_id', fn ($id, $facet) =>
+    ($facet['type'] ?? '') === 'sort' ? 'archive-filters-sort-label' : $id, 10, 2);
+
+// Leave a one-off query arg out of pager links
+add_filter('threespot/facetwp/page_url_args', function ($args) {
+    unset($args['persona']);
+    return $args;
+});
+```
+
+Pager `href`s carry the request's own query args (unslashed on page load,
+decoded on a refresh) and each facet's current selection, and drop a
+trailing `page/<n>`. To keep a site's search form filters when the keyword
+changes, print `facetwp_hidden_vars($get, $facet_names)` as hidden inputs: it
+returns the active `_<facet>` vars, leaving out `paged`, `pager`, `reset` and
+`result_count`.
+
+## SearchWP engines
+
+SearchWP keeps its engine settings in the database, so each environment
+otherwise has to be set up by hand in the admin. Two WP-CLI commands copy them
+as JSON:
+
+```bash
+# Where the engines are right: save them and commit the file
+wp threespot searchwp export-engines config/searchwp-engines.json
+
+# On each environment: replace every engine with the file's, then reindex
+wp threespot searchwp apply-engines config/searchwp-engines.json
+wp searchwp index --rebuild
+```
+
+- `export-engines` prints to the screen when no file is given.
+- `apply-engines` replaces every engine (one missing from the file is
+  removed). It saves through SearchWP's own import, which checks each engine
+  and flags the index as out of date, then reminds you to rebuild it.
+- Both stop with an error when SearchWP isn't active.
+- On Pantheon: `terminus wp <site>.<env> -- threespot searchwp apply-engines /code/config/searchwp-engines.json`.
+
+The commands sit under the same `wp threespot` parent as
+[threespot/wp-fixtures](https://github.com/threespot/wp-fixtures)'
+`wp threespot fixtures`.
 
 ## Registering custom post types and taxonomies
 
@@ -708,6 +784,12 @@ point of enqueue and the site supplies the URL.
 | `threespot/blocks/disabled_heading_levels` | `[1]`                      | Heading levels stripped from `core/heading` |
 | `threespot/blocks/pattern_category`       | `['slug'=>'threespotblock', 'label'=>'Custom Patterns']` | Custom pattern category |
 | `threespot/blocks/vimeo_color`            | `'ff5100'`                  | Read by `format_video_iframe()` helper |
+| `threespot/facetwp/disable_a11y_script`   | `false`                     | Forces FacetWP's "Load a11y support" setting off. See [FacetWP](#facetwp) |
+| `threespot/facetwp/disable_newrelic_on_refresh` | `true`                | Turns off New Relic's browser snippet on FacetWP refreshes |
+| `threespot/facetwp/page_url_args`         | request args + facet selections + `_paged` | Query args of a pager link's `href`; receives the page number |
+| `threespot/facetwp/pager_link_hrefs`      | `false`                     | Gives FacetWP pager links a real `href` |
+| `threespot/facetwp/select_label_id`       | `'facet-label-<name>'`      | Id a facet's `<select>` points at; receives the facet array. `''` skips the facet |
+| `threespot/facetwp/select_labelledby`     | `false`                     | Adds `aria-labelledby` to dropdown and sort `<select>`s |
 | `threespot/helpers/excluded_post_types`   | `['ifso_triggers']`         | Post types stripped from `get_custom_post_types()` |
 | `threespot/helpers/is_live_env`           | `PANTHEON_ENVIRONMENT === 'live'` | Return value of `is_live_env()` |
 | `threespot/helpers/is_pantheon`           | `PANTHEON_ENVIRONMENT` set and not `'lando'` | Return value of `is_pantheon()` |
@@ -761,6 +843,7 @@ All live in the `Threespot\Wp\Helpers` namespace, autoloaded via Composer.
 |---|---|
 | `general.php` | `is_pantheon`, `is_live_env`, `bytes_to_human_size`, `strip_p_tags`, `is_external`, `nowrap`, `trim_excerpt`, `clean_wysiwyg_markup`, `strip_quotes`, `obfuscate`, `get_custom_post_types`, `format_video_iframe` (plus the deprecated `is_production`, which wraps `is_pantheon` and also applies its own filter) |
 | `image.php`   | `calculate_height`, `get_registered_image_sizes`, `blank_gif`, `get_image_file_type`, `bis_get_sizes`, `bis_srcset`, `buildAttributes`, `img_tag`, `get_img_alt`, `get_img_focal_point`, `resolve_bis_crop_param`, `set_img_alt` (plus `fly_*` deprecated aliases) |
+| `facetwp.php` | `facetwp_request_get`, `facetwp_page_path`, `facetwp_page_query_args`, `facetwp_add_href`, `facetwp_add_labelledby`, `facetwp_hidden_vars`. See [FacetWP](#facetwp) |
 | `svg.php`     | `svg`, `append_icon` |
 | `taxonomy.php` | `get_primary_term` |
 
@@ -828,7 +911,7 @@ entries narrow so real secrets are never masked.
 threespot/wp-base-config/
 ├── composer.json                                # type: library
 ├── UPGRADING.md                                 # breaking changes and deprecations: filters / public names / unhookable callbacks
-├── bootstrap.php                                # registers all MU-plugin modules
+├── bootstrap.php                                # registers all MU-plugin modules and WP-CLI commands
 ├── mu-plugins/
 │   ├── threespot-wp-base-config.php             # WP loader; symlink into web/app/mu-plugins/
 │   ├── acf-local-json-autosync.php              # optional drop-in; copy per-site — see "Standalone drop-in mu-plugins"
@@ -842,6 +925,8 @@ threespot/wp-base-config/
 │   ├── vite-base.js                             # consumed via mergeConfig — see "Vite: shared base + per-project wrapper"
 │   └── package.json                             # {"type": "module"} — see "Why dist/package.json exists"
 └── src/
+    ├── Cli/                                     # WP-CLI commands (WP-CLI only)
+    │   └── SearchwpCommand.php                  # wp threespot searchwp export-engines / apply-engines
     ├── MuPlugins/                               # named-callback hook modules
     │   ├── AcfConfig.php
     │   ├── AcornConfig.php
@@ -850,11 +935,13 @@ threespot/wp-base-config/
     │   ├── BlockConfig.php
     │   ├── ContentTypesConfig.php
     │   ├── CriticalConfig.php
+    │   ├── FacetwpConfig.php
     │   ├── LoginConfig.php
     │   ├── SmtpConfig.php
     │   └── ThemeConfig.php
     ├── Helpers/                                 # autoloaded namespaced functions
     │   ├── author.php
+    │   ├── facetwp.php
     │   ├── general.php
     │   ├── image.php
     │   ├── menu.php

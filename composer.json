@@ -20,10 +20,12 @@
     },
     "autoload": {
         "psr-4": {
+            "Threespot\\Wp\\Cli\\": "src/Cli/",
             "Threespot\\Wp\\MuPlugins\\": "src/MuPlugins/"
         },
         "files": [
             "src/Helpers/author.php",
+            "src/Helpers/facetwp.php",
             "src/Helpers/general.php",
             "src/Helpers/image.php",
             "src/Helpers/menu.php",

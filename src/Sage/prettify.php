@@ -78,11 +78,21 @@ function prettify_config() {
         | Enabling this option will redirect search results from /?s=query to
         | /search/query/ and convert `%20` to `+`.
         |
+        | Off by default (changed from Acorn's default). GIH, NMHC and Mosaic
+        | all turned it off, because:
+        | - an empty search redirects to /search/, which 404s;
+        | - it skips any URL with "&", so a search carrying FacetWP filters
+        |   stays at /?s=query while one without them moves;
+        | - every search takes an extra redirect, and spaces come out as "+".
+        |
+        | To turn it back on, set 'nice-search' => ['enabled' => true] in the
+        | override array of the theme's config/prettify.php.
+        |
         */
 
         'nice-search' => [
             // Enable nice search.
-            'enabled' => true,
+            'enabled' => false,// changed from Acorn default
         ],
 
         /*

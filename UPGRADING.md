@@ -9,6 +9,28 @@ agent can be pointed at this file and asked to bring a site up to date.
 
 ---
 
+## Unreleased
+
+### Nice Search is off by default
+
+**What changed.** `prettify_config()` now sets `'nice-search' => ['enabled' =>
+false]`. Searches stay at `/?s=query` instead of redirecting to
+`/search/query/`. GIH, NMHC and Mosaic all turned it off, because an empty
+search redirects to `/search/`, which 404s; URLs with `&` (FacetWP filters) are
+skipped, so some searches move and others don't; and every search takes an
+extra redirect that turns spaces into `+`.
+
+**Action.**
+1. A site whose theme `config/prettify.php` already sets `'nice-search' =>
+   ['enabled' => false]` needs no change. The override can stay or go.
+2. A site that wants `/search/query/` URLs adds `'nice-search' => ['enabled' =>
+   true]` to the override array in its theme's `config/prettify.php`.
+3. Otherwise, check that nothing links to `/search/<query>/` URLs on purpose
+   (templates, menus, redirects). WordPress still serves them, so old links keep
+   working; only the redirect from `/?s=` is gone.
+
+---
+
 ## 0.2.15 → 0.2.16
 
 Not breaking: a method is renamed with a deprecated alias, and empty headings

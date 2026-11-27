@@ -11,6 +11,7 @@ use Threespot\Wp\MuPlugins\AdminConfig;
 use Threespot\Wp\MuPlugins\AssetConfig;
 use Threespot\Wp\MuPlugins\BlockConfig;
 use Threespot\Wp\MuPlugins\CriticalConfig;
+use Threespot\Wp\MuPlugins\FacetwpConfig;
 use Threespot\Wp\MuPlugins\LoginConfig;
 use Threespot\Wp\MuPlugins\SmtpConfig;
 use Threespot\Wp\MuPlugins\ThemeConfig;
@@ -269,5 +270,22 @@ class RegistrationTest extends BrainMonkeyTestCase
         CriticalConfig::register();
 
         $this->assertActionRegistered('threespot/critical/inline_script', [CriticalConfig::class, 'printInlineScript']);
+    }
+
+    public function test_facetwp_config_registers_expected_hooks(): void
+    {
+        FacetwpConfig::register();
+
+        $this->assertActionRegistered('init', [FacetwpConfig::class, 'disableNewRelicOnRefresh']);
+        $this->assertFilterRegistered('option_facetwp_settings', [FacetwpConfig::class, 'disableA11yScript']);
+        $this->assertFilterRegistered('facetwp_facet_pager_link', [FacetwpConfig::class, 'addPagerLinkHref']);
+        $this->assertFilterRegistered('facetwp_facet_html', [FacetwpConfig::class, 'addSelectLabelledby']);
+
+        // FacetWP sets is_refresh on init at priority 20
+        $this->assertSame(21, $this->actions['init'][0]['priority']);
+
+        // After the sites' own filters (10 and 20), so the module sees their markup
+        $this->assertGreaterThan(20, $this->filters['facetwp_facet_pager_link'][0]['priority']);
+        $this->assertGreaterThan(20, $this->filters['facetwp_facet_html'][0]['priority']);
     }
 }

@@ -28,6 +28,13 @@ class PrettifyConfigTest extends TestCase
         $this->assertTrue($config['relative-urls']['enabled']);
     }
 
+    public function test_nice_search_is_off(): void
+    {
+        // Nice Search adds a redirect hop, sends an empty search to a 404 at
+        // /search/, and skips URLs carrying FacetWP filters.
+        $this->assertFalse(prettify_config()['nice-search']['enabled']);
+    }
+
     public function test_relative_url_hooks_is_a_non_empty_list(): void
     {
         $hooks = prettify_config()['relative-urls']['hooks'];
